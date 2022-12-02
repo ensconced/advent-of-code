@@ -77,6 +77,4 @@ fn main() {
     let part_2_answer = input.lines().map(part_2_game_score).sum::<u32>();
     println!("part 1: {}", part_1_answer);
     println!("part 2: {}", part_2_answer);
-    assert_eq!(part_1_answer, 11906);
-    assert_eq!(part_2_answer, 11186);
 }
