@@ -1,12 +1,9 @@
-use std::{env, fs::read_to_string, path::Path};
-
 use itertools::Itertools;
 
-fn main() {
-    let cargo_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let input_path = Path::new(&cargo_dir).join("input.txt");
-    let input = read_to_string(input_path).unwrap();
+use utils::read_input;
 
+fn main() {
+    let input = read_input();
     let line_groups = input.lines().group_by(|line| !line.is_empty());
     let elf_items = line_groups
         .into_iter()
