@@ -1,22 +1,30 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+    str::Lines,
+};
 
 struct DirInfo<'a> {
-    size: u32,
-    entries: RefCell<HashMap<String, DirEntry<'a>>>,
+    size: Cell<u32>,
+    entries: RefCell<HashMap<String, Rc<DirInfo<'a>>>>,
     parent: Option<Rc<DirInfo<'a>>>,
 }
 
-enum DirEntry<'a> {
-    Dir(Rc<DirInfo<'a>>),
-}
-
-impl<'a> DirEntry<'a> {
-    fn new_child_dir(parent: &Rc<DirInfo<'a>>) -> Self {
-        Self::Dir(Rc::new(DirInfo {
-            size: 0,
+impl<'a> DirInfo<'a> {
+    fn new_child_dir(parent: &Rc<DirInfo<'a>>) -> Rc<Self> {
+        Rc::new(DirInfo {
+            size: Cell::new(0),
             entries: RefCell::new(HashMap::new()),
             parent: Some(parent.clone()),
-        }))
+        })
+    }
+
+    fn add_file(&self, file_size: u32) {
+        self.size.set(self.size.get() + file_size);
+        if let Some(parent) = &self.parent {
+            parent.add_file(file_size);
+        }
     }
 }
 
@@ -61,22 +69,30 @@ fn parse_line(line: &str) -> ParsedLine {
 
 fn find_child_dir<'a>(parent_dir: Rc<DirInfo<'a>>, child_name: &str) -> Rc<DirInfo<'a>> {
     let current_dir_contents = parent_dir.entries.borrow();
-    if let Some(DirEntry::Dir(child_dir_info)) = current_dir_contents.get(child_name) {
+    if let Some(child_dir_info) = current_dir_contents.get(child_name) {
         child_dir_info.clone()
     } else {
         panic!("failed to find child dir to cd into");
     }
 }
 
-fn main() {
+struct FilesystemSummary<'a> {
+    root: Rc<DirInfo<'a>>,
+    all_dirs: Vec<Rc<DirInfo<'a>>>,
+}
+
+fn build_filesystem(lines: Lines) -> FilesystemSummary {
+    let mut all_dirs = vec![];
     let root = Rc::new(DirInfo {
-        size: 0,
+        size: Cell::new(0),
         entries: RefCell::new(HashMap::new()),
         parent: None,
     });
+    all_dirs.push(root.clone());
+
     let mut current_dir = root.clone();
 
-    for line in utils::read_input().lines().map(parse_line) {
+    for line in lines.map(parse_line) {
         match line {
             ParsedLine::ChangeDir(ChangeDirDest::Up) => {
                 let new_dir = current_dir.parent.as_ref().unwrap().clone();
@@ -89,24 +105,46 @@ fn main() {
                 current_dir = find_child_dir(current_dir, dir_name);
             }
             ParsedLine::Directory { dir_name } => {
+                let new_dir = DirInfo::new_child_dir(&current_dir);
+                all_dirs.push(new_dir.clone());
+
                 current_dir
                     .entries
                     .borrow_mut()
-                    .insert(dir_name.to_owned(), DirEntry::new_child_dir(&current_dir));
+                    .insert(dir_name.to_owned(), new_dir);
             }
-            // ParsedLine::File { file_size } => {
-            //     current_dir
-            //         .entries
-            //         .borrow_mut()
-            //         .insert(dir_name.to_owned(), DirEntry::new_child_dir(&current_dir));
-            // }
-            // ParsedLine::ListDirs => {
-            //     // Don't actually need to do anything here.
-            // }
-            ,
-            _ => {
-                todo!()
+            ParsedLine::File { file_size } => {
+                current_dir.add_file(file_size);
+            }
+            ParsedLine::ListDirs => {
+                // Don't actually need to do anything here.
             }
         }
     }
+    FilesystemSummary { root, all_dirs }
+}
+
+fn main() {
+    let input = utils::read_input();
+    let FilesystemSummary { root, all_dirs } = build_filesystem(input.lines());
+    let part_1_answer = all_dirs
+        .iter()
+        .map(|dir| dir.size.get())
+        .filter(|size| *size <= 100000)
+        .sum::<u32>();
+
+    let total_disk_space = 70000000;
+    let required_free_space = 30000000;
+    let current_free_space = total_disk_space - root.size.get();
+    let further_space_to_delete = required_free_space - current_free_space;
+
+    let part_2_answer = all_dirs
+        .iter()
+        .map(|dir| dir.size.get())
+        .filter(|size| *size >= further_space_to_delete)
+        .min()
+        .unwrap();
+
+    println!("part 1: {}", part_1_answer);
+    println!("part 2: {}", part_2_answer);
 }
