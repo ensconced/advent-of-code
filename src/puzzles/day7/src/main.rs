@@ -7,13 +7,12 @@ struct DirInfo<'a> {
 }
 
 enum DirEntry<'a> {
-    file { size: u32 },
-    dir(Rc<DirInfo<'a>>),
+    Dir(Rc<DirInfo<'a>>),
 }
 
 impl<'a> DirEntry<'a> {
     fn new_child_dir(parent: &Rc<DirInfo<'a>>) -> Self {
-        Self::dir(Rc::new(DirInfo {
+        Self::Dir(Rc::new(DirInfo {
             size: 0,
             entries: RefCell::new(HashMap::new()),
             parent: Some(parent.clone()),
@@ -60,6 +59,15 @@ fn parse_line(line: &str) -> ParsedLine {
     }
 }
 
+fn find_child_dir<'a>(parent_dir: Rc<DirInfo<'a>>, child_name: &str) -> Rc<DirInfo<'a>> {
+    let current_dir_contents = parent_dir.entries.borrow();
+    if let Some(DirEntry::Dir(child_dir_info)) = current_dir_contents.get(child_name) {
+        child_dir_info.clone()
+    } else {
+        panic!("failed to find child dir to cd into");
+    }
+}
+
 fn main() {
     let root = Rc::new(DirInfo {
         size: 0,
@@ -78,16 +86,7 @@ fn main() {
                 current_dir = root.clone();
             }
             ParsedLine::ChangeDir(ChangeDirDest::ChildDir { dir_name }) => {
-                let current_dir_contents = current_dir.entries.borrow();
-                let new_dir = if let Some(DirEntry::dir(child_dir_info)) =
-                    current_dir_contents.get(dir_name)
-                {
-                    child_dir_info.clone()
-                } else {
-                    panic!("failed to find child dir to cd into");
-                };
-                drop(current_dir_contents);
-                current_dir = new_dir;
+                current_dir = find_child_dir(current_dir, dir_name);
             }
             ParsedLine::Directory { dir_name } => {
                 current_dir
@@ -96,7 +95,10 @@ fn main() {
                     .insert(dir_name.to_owned(), DirEntry::new_child_dir(&current_dir));
             }
             // ParsedLine::File { file_size } => {
-            //     todo!()
+            //     current_dir
+            //         .entries
+            //         .borrow_mut()
+            //         .insert(dir_name.to_owned(), DirEntry::new_child_dir(&current_dir));
             // }
             // ParsedLine::ListDirs => {
             //     // Don't actually need to do anything here.
