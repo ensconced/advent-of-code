@@ -1,23 +1,23 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 struct DirInfo<'a> {
     size: u32,
     entries: RefCell<HashMap<String, DirEntry<'a>>>,
-    parent: Option<&'a DirInfo<'a>>,
+    parent: Option<Rc<DirInfo<'a>>>,
 }
 
 enum DirEntry<'a> {
     file { size: u32 },
-    dir(DirInfo<'a>),
+    dir(Rc<DirInfo<'a>>),
 }
 
 impl<'a> DirEntry<'a> {
-    fn new_child_dir(parent: &'a DirInfo<'a>) -> Self {
-        Self::dir(DirInfo {
+    fn new_child_dir(parent: &Rc<DirInfo<'a>>) -> Self {
+        Self::dir(Rc::new(DirInfo {
             size: 0,
             entries: RefCell::new(HashMap::new()),
-            parent: Some(parent),
-        })
+            parent: Some(parent.clone()),
+        }))
     }
 }
 
@@ -61,37 +61,39 @@ fn parse_line(line: &str) -> ParsedLine {
 }
 
 fn main() {
-    let root = DirInfo {
+    let root = Rc::new(DirInfo {
         size: 0,
         entries: RefCell::new(HashMap::new()),
         parent: None,
-    };
-    let mut current_dir = &root;
+    });
+    let mut current_dir = root.clone();
 
     for line in utils::read_input().lines().map(parse_line) {
         match line {
             ParsedLine::ChangeDir(ChangeDirDest::Up) => {
                 let new_dir = current_dir.parent.as_ref().unwrap().clone();
-                current_dir = new_dir;
+                current_dir = new_dir.clone();
             }
             ParsedLine::ChangeDir(ChangeDirDest::Root) => {
-                current_dir = &root;
+                current_dir = root.clone();
             }
             ParsedLine::ChangeDir(ChangeDirDest::ChildDir { dir_name }) => {
-                let asdf = current_dir.entries.borrow();
-                let child_dir_entry = asdf.get(dir_name);
-
-                if let Some(DirEntry::dir(child_dir_info)) = child_dir_entry {
-                    current_dir = child_dir_info;
+                let current_dir_contents = current_dir.entries.borrow();
+                let new_dir = if let Some(DirEntry::dir(child_dir_info)) =
+                    current_dir_contents.get(dir_name)
+                {
+                    child_dir_info.clone()
                 } else {
                     panic!("failed to find child dir to cd into");
-                }
+                };
+                drop(current_dir_contents);
+                current_dir = new_dir;
             }
             ParsedLine::Directory { dir_name } => {
-                current_dir.entries.borrow_mut().insert(
-                    dir_name.to_owned(),
-                    DirEntry::new_child_dir(current_dir.clone()),
-                );
+                current_dir
+                    .entries
+                    .borrow_mut()
+                    .insert(dir_name.to_owned(), DirEntry::new_child_dir(&current_dir));
             }
             // ParsedLine::File { file_size } => {
             //     todo!()
