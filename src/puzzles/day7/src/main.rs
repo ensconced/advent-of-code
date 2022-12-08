@@ -12,14 +12,6 @@ struct DirInfo<'a> {
 }
 
 impl<'a> DirInfo<'a> {
-    fn new_child_dir(parent: &Rc<DirInfo<'a>>) -> Rc<Self> {
-        Rc::new(DirInfo {
-            size: Cell::new(0),
-            entries: RefCell::new(HashMap::new()),
-            parent: Some(parent.clone()),
-        })
-    }
-
     fn add_file(&self, file_size: u32) {
         self.size.set(self.size.get() + file_size);
         if let Some(parent) = &self.parent {
@@ -83,13 +75,18 @@ struct FilesystemSummary<'a> {
 
 fn build_filesystem(lines: Lines) -> FilesystemSummary {
     let mut all_dirs = vec![];
-    let root = Rc::new(DirInfo {
-        size: Cell::new(0),
-        entries: RefCell::new(HashMap::new()),
-        parent: None,
-    });
-    all_dirs.push(root.clone());
 
+    let mut create_child_dir = |parent| {
+        let result = Rc::new(DirInfo {
+            size: Cell::new(0),
+            entries: RefCell::new(HashMap::new()),
+            parent,
+        });
+        all_dirs.push(result.clone());
+        result
+    };
+
+    let root = create_child_dir(None);
     let mut current_dir = root.clone();
 
     for line in lines.map(parse_line) {
@@ -105,8 +102,7 @@ fn build_filesystem(lines: Lines) -> FilesystemSummary {
                 current_dir = find_child_dir(current_dir, dir_name);
             }
             ParsedLine::Directory { dir_name } => {
-                let new_dir = DirInfo::new_child_dir(&current_dir);
-                all_dirs.push(new_dir.clone());
+                let new_dir = create_child_dir(Some(current_dir.clone()));
 
                 current_dir
                     .entries
