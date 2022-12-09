@@ -54,12 +54,19 @@ fn max_blocking_tree_heights(line: &Vec<i32>) -> Vec<i32> {
 }
 
 fn visibility_from_side(line_direction: u32, grid: &Matrix<i32>) -> Matrix<bool> {
-    grid.transform_lines(line_direction, |row| {
-        let blockers = max_blocking_tree_heights(row);
-        row.iter()
+    grid.transform_lines(line_direction, |line| {
+        let blockers = max_blocking_tree_heights(line);
+        line.iter()
             .enumerate()
             .map(|(col_idx, tree)| *tree > blockers[col_idx])
             .collect()
+    })
+}
+
+fn scenic_scores_in_direction(line_direction: u32, grid: &Matrix<i32>) -> Matrix<u32> {
+    grid.transform_lines(line_direction, |line| {
+        // TODO - create running blocker lookup array and use that to find directional scenic scores
+        todo!();
     })
 }
 
@@ -78,7 +85,7 @@ fn main() {
 
     let visibility_grid = (0..4)
         .map(|line_direction| visibility_from_side(line_direction, &grid))
-        .reduce(|overall_vis_grid, side_vis_grid| {
+        .reduce(|overall_vis_grid, direction_vis_grid| {
             Matrix(
                 overall_vis_grid
                     .rows()
@@ -86,7 +93,7 @@ fn main() {
                     .map(|(row_idx, row)| {
                         row.into_iter()
                             .enumerate()
-                            .map(|(col_idx, val)| val || side_vis_grid.0[row_idx][col_idx])
+                            .map(|(col_idx, val)| val || direction_vis_grid.0[row_idx][col_idx])
                             .collect()
                     })
                     .collect(),
@@ -95,7 +102,28 @@ fn main() {
         .unwrap();
 
     let part_1_answer = visibility_grid.rows().flatten().filter(|b| *b).count();
-    println!("part 1: {}", part_1_answer);
 
-    // TODO - use running array of length 10 to lookup latest idx of trees of given height (array of options, to account for "none" case, I think)
+    let scenic_score_grid = (0..4)
+        .map(|line_direction| scenic_scores_in_direction(line_direction, &grid))
+        .reduce(|overall_scenic_score_grid, direction_scenic_score_grid| {
+            Matrix(
+                overall_scenic_score_grid
+                    .rows()
+                    .enumerate()
+                    .map(|(row_idx, row)| {
+                        row.into_iter()
+                            .enumerate()
+                            .map(|(col_idx, val)| {
+                                val * direction_scenic_score_grid.0[row_idx][col_idx]
+                            })
+                            .collect()
+                    })
+                    .collect(),
+            )
+        })
+        .unwrap();
+
+    let part_2_answer = scenic_score_grid.rows().flatten().max().unwrap();
+    println!("part 1: {}", part_1_answer);
+    println!("part 2: {}", part_2_answer);
 }
