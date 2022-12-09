@@ -97,5 +97,5 @@ fn main() {
     let part_1_answer = visibility_grid.rows().flatten().filter(|b| *b).count();
     println!("part 1: {}", part_1_answer);
 
-    // TODO - use binary search tree for part 2, to look up latest idx per line of a tree of matching or greater height...
+    // TODO - use running array of length 10 to lookup latest idx of trees of given height (array of options, to account for "none" case, I think)
 }
