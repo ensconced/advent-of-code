@@ -7,7 +7,7 @@ struct Monkey {
     test_divisor: i64,
     next_monkey_if_true: usize,
     next_monkey_if_false: usize,
-    activity: u32,
+    activity: u64,
 }
 
 fn take_monkey_index_line<'a>(lines: &mut impl Iterator<Item = &'a str>) {
@@ -44,12 +44,12 @@ fn take_compute_new_worry_level<'a>(
 
                 let lhs = match parts.next().unwrap() {
                     "old" => old_worry_level,
-                    foop => str::parse::<i64>(foop).unwrap(),
+                    other_str => str::parse::<i64>(other_str).unwrap(),
                 };
                 let operation = parts.next().unwrap();
                 let rhs = match parts.next().unwrap() {
                     "old" => old_worry_level,
-                    foop => str::parse::<i64>(foop).unwrap(),
+                    other_str => str::parse::<i64>(other_str).unwrap(),
                 };
                 match operation {
                     "*" => lhs * rhs,
@@ -123,14 +123,27 @@ fn parse_monkeys(input: String) -> Vec<Monkey> {
         .collect()
 }
 
+fn monkey_business_level(mut monkeys: Vec<Monkey>) -> u64 {
+    monkeys.sort_by_key(|monkey| monkey.activity);
+    monkeys.reverse();
+    monkeys
+        .into_iter()
+        .take(2)
+        .map(|monkey| monkey.activity)
+        .product()
+}
+
 fn main() {
     let mut monkeys = parse_monkeys(read_input());
-    (0..20).for_each(|_| {
+    let divisor_product: i64 = monkeys.iter().map(|monkey| monkey.test_divisor).product();
+
+    (0..10000).for_each(|_| {
         (0..monkeys.len()).for_each(|monkey_idx| {
             while !monkeys[monkey_idx].items.is_empty() {
                 monkeys[monkey_idx].activity += 1;
                 let item = monkeys[monkey_idx].items.remove(0);
-                let new_worry_level = (monkeys[monkey_idx].compute_new_worry_level)(item) / 3;
+                let new_worry_level =
+                    (monkeys[monkey_idx].compute_new_worry_level)(item) % divisor_product;
                 let next_monkey = if new_worry_level % monkeys[monkey_idx].test_divisor == 0 {
                     monkeys[monkey_idx].next_monkey_if_true
                 } else {
@@ -140,12 +153,5 @@ fn main() {
             }
         });
     });
-    monkeys.sort_by_key(|monkey| monkey.activity);
-    monkeys.reverse();
-    let part_1_answer: u32 = monkeys
-        .into_iter()
-        .take(2)
-        .map(|monkey| monkey.activity)
-        .product();
-    println!("part 1: {}", part_1_answer);
+    println!("part 1: {}", monkey_business_level(monkeys));
 }
