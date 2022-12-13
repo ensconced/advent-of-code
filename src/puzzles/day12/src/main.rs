@@ -42,8 +42,8 @@ fn generate_adjacencies(input: String) -> HashMap<(usize, usize), Vec<(usize, us
 fn main() {
     let adjacencies = generate_adjacencies(read_input());
     // TODO -
-    // generate DAG
-    // initialise graph
+    // topologically sort DAG
+    // initialise d values - no need to track pi values
     // iterate through DAG and all incoming edges for each node
     // return fully relaxed value for end node
 }
