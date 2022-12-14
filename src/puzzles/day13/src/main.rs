@@ -1,17 +1,22 @@
 use std::{cmp::Ordering, iter::Peekable};
 
-use itertools::Itertools;
+use itertools::{EitherOrBoth, Itertools};
 use utils::read_input;
 
+#[derive(Debug)]
 enum Item {
     List(Vec<Item>),
     Num(u32),
 }
 
-fn items_are_correctly_ordered(left_item: Item, right_item: Item) -> Ordering {
+fn items_are_correctly_ordered(left_item: Item, right_item: Item) -> Option<bool> {
     match left_item {
         Item::Num(left_num) => match right_item {
-            Item::Num(right_num) => left_num.cmp(&right_num),
+            Item::Num(right_num) => match left_num.cmp(&right_num) {
+                Ordering::Less => Some(true),
+                Ordering::Greater => Some(false),
+                Ordering::Equal => None,
+            },
             Item::List(right_vec) => pair_of_lists_is_correctly_ordered(vec![left_item], right_vec),
         },
         Item::List(left_vec) => match right_item {
@@ -23,17 +28,22 @@ fn items_are_correctly_ordered(left_item: Item, right_item: Item) -> Ordering {
     }
 }
 
-fn pair_of_lists_is_correctly_ordered(left_packet: Vec<Item>, right_packet: Vec<Item>) -> Ordering {
-    let max_len = usize::max(left_packet.len(), right_packet.len());
-    for idx in 0..max_len {
-        if let Some(left_item) = left_packet.get(idx) {
-            if let Some(right_item) = right_packet.get(idx) {
-            } else {
+fn pair_of_lists_is_correctly_ordered(
+    left_packet: Vec<Item>,
+    right_packet: Vec<Item>,
+) -> Option<bool> {
+    for either_or_both in left_packet.into_iter().zip_longest(right_packet) {
+        match either_or_both {
+            EitherOrBoth::Right(_) => return Some(true),
+            EitherOrBoth::Left(_) => return Some(false),
+            EitherOrBoth::Both(left_item, right_item) => {
+                if let Some(result) = items_are_correctly_ordered(left_item, right_item) {
+                    return Some(result);
+                }
             }
-        } else {
-            None
         }
     }
+    None
 }
 
 fn maybe_take_digit(packet: &mut Peekable<impl Iterator<Item = char>>) -> Option<char> {
@@ -48,12 +58,27 @@ fn take_num(packet: &mut Peekable<impl Iterator<Item = char>>) -> u32 {
     str::parse(&result).unwrap()
 }
 
+fn maybe_take_comma(packet: &mut Peekable<impl Iterator<Item = char>>) -> bool {
+    if let Some(ch) = packet.peek() {
+        if *ch == ',' {
+            packet.next();
+            return true;
+        }
+    }
+    false
+}
+
 fn take_vec(packet: &mut Peekable<impl Iterator<Item = char>>) -> Vec<Item> {
     packet.next(); // '['
     let mut result = vec![];
-    while let Some(item) = maybe_take_item(packet) {
+    if let Some(first_item) = maybe_take_item(packet) {
+        result.push(first_item);
+    }
+    while maybe_take_comma(packet) {
+        let item = maybe_take_item(packet).unwrap();
         result.push(item);
     }
+    packet.next(); // ']'
     result
 }
 
@@ -74,15 +99,22 @@ fn parse_packet(packet: &str) -> Vec<Item> {
 fn main() {
     let input = read_input();
     let chunks = input.lines().chunks(3);
-    let part_1_answer: usize = chunks
+    let packets: Vec<_> = chunks
         .into_iter()
         .map(|chunk| {
             let lines: Vec<_> = chunk.into_iter().collect();
-            pair_of_lists_is_correctly_ordered(parse_packet(lines[0]), parse_packet(lines[1]))
+            (parse_packet(lines[0]), parse_packet(lines[1]))
         })
+        .collect();
+
+    let part_1_answer: usize = packets
+        .into_iter()
+        .map(|(a, b)| pair_of_lists_is_correctly_ordered(a, b))
         .enumerate()
         .filter_map(|(pair_idx, is_correctly_ordered)| {
-            (is_correctly_ordered == Ordering::Less).then_some(pair_idx)
+            let result = is_correctly_ordered
+                .unwrap_or_else(|| panic!("no result for pair_idx {}", pair_idx + 1));
+            result.then_some(pair_idx + 1)
         })
         .sum();
 
