@@ -15,7 +15,9 @@ impl SectionIdRange {
 
 fn parse_range(range_str: &str) -> SectionIdRange {
     let mut numbers = range_str.split('-').map(|range_section| {
-        str::parse::<u32>(range_section).unwrap_or_else(|_| panic!("failed to parse string to u32"))
+        range_section
+            .parse()
+            .unwrap_or_else(|_| panic!("failed to parse string to u32"))
     });
     let first = numbers
         .next()

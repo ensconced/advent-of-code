@@ -22,7 +22,7 @@ fn take_starting_items<'a>(lines: &mut impl Iterator<Item = &'a str>) -> Vec<i64
                 .strip_prefix("Starting items: ")
                 .unwrap()
                 .split(", ")
-                .map(|str_num| str::parse::<i64>(str_num).unwrap())
+                .map(|str_num| str_num.parse::<i64>().unwrap())
                 .collect()
         })
         .unwrap()
@@ -46,11 +46,11 @@ fn take_compute_new_worry_level<'a>(
             Box::new(move |old_worry_level: i64| {
                 let lhs = match parts[0].as_str() {
                     "old" => old_worry_level,
-                    other_str => str::parse::<i64>(other_str).unwrap(),
+                    other_str => other_str.parse::<i64>().unwrap(),
                 };
                 let rhs = match parts[2].as_str() {
                     "old" => old_worry_level,
-                    other_str => str::parse::<i64>(other_str).unwrap(),
+                    other_str => other_str.parse::<i64>().unwrap(),
                 };
                 match parts[1].as_str() {
                     "*" => lhs * rhs,
@@ -63,39 +63,36 @@ fn take_compute_new_worry_level<'a>(
 }
 
 fn take_test_divisor<'a>(lines: &mut impl Iterator<Item = &'a str>) -> i64 {
-    str::parse::<i64>(
-        lines
-            .next()
-            .unwrap()
-            .trim()
-            .strip_prefix("Test: divisible by ")
-            .unwrap(),
-    )
-    .unwrap()
+    lines
+        .next()
+        .unwrap()
+        .trim()
+        .strip_prefix("Test: divisible by ")
+        .unwrap()
+        .parse::<i64>()
+        .unwrap()
 }
 
 fn take_next_monkey_if_true<'a>(lines: &mut impl Iterator<Item = &'a str>) -> usize {
-    str::parse::<usize>(
-        lines
-            .next()
-            .unwrap()
-            .trim()
-            .strip_prefix("If true: throw to monkey ")
-            .unwrap(),
-    )
-    .unwrap()
+    lines
+        .next()
+        .unwrap()
+        .trim()
+        .strip_prefix("If true: throw to monkey ")
+        .unwrap()
+        .parse()
+        .unwrap()
 }
 
 fn take_next_monkey_if_false<'a>(lines: &mut impl Iterator<Item = &'a str>) -> usize {
-    str::parse::<usize>(
-        lines
-            .next()
-            .unwrap()
-            .trim()
-            .strip_prefix("If false: throw to monkey ")
-            .unwrap(),
-    )
-    .unwrap()
+    lines
+        .next()
+        .unwrap()
+        .trim()
+        .strip_prefix("If false: throw to monkey ")
+        .unwrap()
+        .parse()
+        .unwrap()
 }
 
 fn take_monkey<'a>(mut lines: impl Iterator<Item = &'a str>) -> Monkey {

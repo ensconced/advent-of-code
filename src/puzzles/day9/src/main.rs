@@ -45,7 +45,7 @@ fn run_simulation(knot_count: usize) -> Vec<Vector> {
             "R" => Vector(1, 0),
             _ => panic!("unexpected direction"),
         };
-        let step_count = str::parse::<i32>(parts.next().unwrap()).unwrap();
+        let step_count = parts.next().unwrap().parse().unwrap();
         (0..step_count).for_each(|_| {
             knots[0] = knots[0] + head_direction;
             for knot_idx in 1..knot_count {

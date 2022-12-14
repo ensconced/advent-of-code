@@ -26,7 +26,7 @@ fn main() {
             let parts: Vec<_> = line.split(' ').collect();
             run_cycle(register_x);
             run_cycle(register_x);
-            register_x += str::parse::<i32>(parts[1]).unwrap();
+            register_x += parts[1].parse::<i32>().unwrap();
         }
     });
 

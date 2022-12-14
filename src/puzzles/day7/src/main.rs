@@ -53,7 +53,8 @@ fn parse_line(line: &str) -> ParsedLine {
         let file_size_part = parts.next().unwrap_or_else(|| {
             panic!("expected to find file size separated from file name by space character")
         });
-        let file_size = str::parse(file_size_part)
+        let file_size = file_size_part
+            .parse()
             .unwrap_or_else(|_| panic!("failed to parse file size as number"));
         ParsedLine::File { file_size }
     }

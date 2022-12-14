@@ -36,11 +36,15 @@ fn parse_move_operations(move_operations_lines: &[&str]) -> Vec<MoveOp> {
         .map(|line| {
             let parts: Vec<_> = line.split_ascii_whitespace().collect();
             MoveOp {
-                count: str::parse(parts[1]).unwrap_or_else(|_| panic!("failed to parse count")),
-                source_stack: str::parse::<usize>(parts[3])
+                count: parts[1]
+                    .parse()
+                    .unwrap_or_else(|_| panic!("failed to parse count")),
+                source_stack: parts[3]
+                    .parse::<usize>()
                     .unwrap_or_else(|_| panic!("failed to parse source stack"))
                     - 1,
-                dest_stack: str::parse::<usize>(parts[5])
+                dest_stack: parts[5]
+                    .parse::<usize>()
                     .unwrap_or_else(|_| panic!("failed to parse dest stack"))
                     - 1,
             }

@@ -22,8 +22,8 @@ fn get_rock_positions() -> HashSet<(i32, i32)> {
         line.split(" -> ")
             .map(|section| {
                 let coords: Vec<_> = section.split(',').collect();
-                let x: i32 = str::parse(coords[0]).unwrap();
-                let y: i32 = str::parse(coords[1]).unwrap();
+                let x: i32 = coords[0].parse().unwrap();
+                let y: i32 = coords[1].parse().unwrap();
                 (x, y)
             })
             .tuple_windows()

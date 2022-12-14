@@ -74,7 +74,7 @@ fn take_num(packet: &mut Peekable<impl Iterator<Item = char>>) -> u32 {
     while let Some(digit) = maybe_take_digit(packet) {
         result.push(digit);
     }
-    str::parse(&result).unwrap()
+    result.parse().unwrap()
 }
 
 fn maybe_take_comma(packet: &mut Peekable<impl Iterator<Item = char>>) -> bool {

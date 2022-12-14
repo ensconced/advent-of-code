@@ -9,7 +9,7 @@ fn main() {
         .into_iter()
         .filter_map(|(not_empty, elf_lines)| not_empty.then_some(elf_lines));
     let elf_calorie_totals =
-        elf_items.map(|items| items.fold(0, |acc, item| acc + str::parse::<u32>(item).unwrap()));
+        elf_items.map(|items| items.fold(0, |acc, item| acc + item.parse::<u32>().unwrap()));
     let top_three: Vec<_> = elf_calorie_totals.sorted().rev().take(3).collect();
 
     let part_1_answer = top_three.first().cloned().unwrap_or(0);
