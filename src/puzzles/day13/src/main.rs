@@ -8,24 +8,41 @@ enum Item {
     Num(u32),
 }
 
-fn pair_is_correctly_ordered(left_packet: Vec<Item>, right_packet: Vec<Item>) -> bool {
+fn items_are_correctly_ordered(left_item: Item, right_item: Item) -> bool {
     todo!()
 }
 
-fn take_num(packet: &mut impl Iterator<Item = char>) -> u32 {
+fn pair_of_lists_is_correctly_ordered(left_packet: Vec<Item>, right_packet: Vec<Item>) -> bool {
     todo!()
 }
 
-fn take_vec(packet: &mut impl Iterator<Item = char>) -> Vec<Item> {
-    todo!()
+fn maybe_take_digit(packet: &mut Peekable<impl Iterator<Item = char>>) -> Option<char> {
+    packet.next_if(|ch| ch.is_ascii_digit())
+}
+
+fn take_num(packet: &mut Peekable<impl Iterator<Item = char>>) -> u32 {
+    let mut result = String::new();
+    while let Some(digit) = maybe_take_digit(packet) {
+        result.push(digit);
+    }
+    str::parse(&result).unwrap()
+}
+
+fn take_vec(packet: &mut Peekable<impl Iterator<Item = char>>) -> Vec<Item> {
+    packet.next(); // '['
+    let mut result = vec![];
+    while let Some(item) = maybe_take_item(packet) {
+        result.push(item);
+    }
+    result
 }
 
 fn maybe_take_item(packet: &mut Peekable<impl Iterator<Item = char>>) -> Option<Item> {
     let next_char = packet.peek().cloned();
-    next_char.map(|ch| match ch {
-        '0'..='9' => Item::Num(take_num(packet)),
-        '[' => Item::List(take_vec(packet)),
-        _ => panic!("unexpected char"),
+    next_char.and_then(|ch| match ch {
+        '0'..='9' => Some(Item::Num(take_num(packet))),
+        '[' => Some(Item::List(take_vec(packet))),
+        _ => None,
     })
 }
 
@@ -41,7 +58,7 @@ fn main() {
         .into_iter()
         .map(|chunk| {
             let lines: Vec<_> = chunk.into_iter().collect();
-            pair_is_correctly_ordered(parse_packet(lines[0]), parse_packet(lines[1]))
+            pair_of_lists_is_correctly_ordered(parse_packet(lines[0]), parse_packet(lines[1]))
         })
         .enumerate()
         .filter_map(|(pair_idx, is_correctly_ordered)| is_correctly_ordered.then_some(pair_idx))
