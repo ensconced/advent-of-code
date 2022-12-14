@@ -56,16 +56,12 @@ fn count_settled_grains(mut rocks: HashSet<(i32, i32)>, include_floor: bool) -> 
 
     loop {
         let mut sand_position = (500, -1);
+        let mut settled = false;
         loop {
             if !include_floor && sand_position.1 > rocks_max_y {
                 return settled_sand_grains;
             } else if include_floor && sand_position.1 == rocks_max_y + 1 {
-                rocks.insert(sand_position);
-                settled_sand_grains += 1;
-                if sand_position == (500, 0) {
-                    return settled_sand_grains;
-                }
-                break;
+                settled = true;
             } else if !rocks.contains(&(sand_position.0, sand_position.1 + 1)) {
                 sand_position = (sand_position.0, sand_position.1 + 1);
             } else if !rocks.contains(&(sand_position.0 - 1, sand_position.1 + 1)) {
@@ -73,8 +69,12 @@ fn count_settled_grains(mut rocks: HashSet<(i32, i32)>, include_floor: bool) -> 
             } else if !rocks.contains(&(sand_position.0 + 1, sand_position.1 + 1)) {
                 sand_position = (sand_position.0 + 1, sand_position.1 + 1);
             } else {
+                settled = true;
+            }
+            if settled {
                 rocks.insert(sand_position);
                 settled_sand_grains += 1;
+
                 if sand_position == (500, 0) {
                     return settled_sand_grains;
                 }
