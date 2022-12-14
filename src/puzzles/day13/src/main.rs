@@ -1,4 +1,4 @@
-use std::iter::Peekable;
+use std::{cmp::Ordering, iter::Peekable};
 
 use itertools::Itertools;
 use utils::read_input;
@@ -8,12 +8,32 @@ enum Item {
     Num(u32),
 }
 
-fn items_are_correctly_ordered(left_item: Item, right_item: Item) -> bool {
-    todo!()
+fn items_are_correctly_ordered(left_item: Item, right_item: Item) -> Ordering {
+    match left_item {
+        Item::Num(left_num) => match right_item {
+            Item::Num(right_num) => left_num.cmp(&right_num),
+            Item::List(right_vec) => pair_of_lists_is_correctly_ordered(vec![left_item], right_vec),
+        },
+        Item::List(left_vec) => match right_item {
+            Item::Num(right_num) => {
+                pair_of_lists_is_correctly_ordered(left_vec, vec![Item::Num(right_num)])
+            }
+            Item::List(right_vec) => pair_of_lists_is_correctly_ordered(left_vec, right_vec),
+        },
+    }
 }
 
-fn pair_of_lists_is_correctly_ordered(left_packet: Vec<Item>, right_packet: Vec<Item>) -> bool {
-    todo!()
+fn pair_of_lists_is_correctly_ordered(left_packet: Vec<Item>, right_packet: Vec<Item>) -> Ordering {
+    let max_len = usize::max(left_packet.len(), right_packet.len());
+    for idx in 0..max_len {
+        if let Some(left_item) = left_packet.get(idx) {
+            if let Some(right_item) = right_packet.get(idx) {
+            } else {
+            }
+        } else {
+            None
+        }
+    }
 }
 
 fn maybe_take_digit(packet: &mut Peekable<impl Iterator<Item = char>>) -> Option<char> {
@@ -61,7 +81,9 @@ fn main() {
             pair_of_lists_is_correctly_ordered(parse_packet(lines[0]), parse_packet(lines[1]))
         })
         .enumerate()
-        .filter_map(|(pair_idx, is_correctly_ordered)| is_correctly_ordered.then_some(pair_idx))
+        .filter_map(|(pair_idx, is_correctly_ordered)| {
+            (is_correctly_ordered == Ordering::Less).then_some(pair_idx)
+        })
         .sum();
 
     println!("part 1: {}", part_1_answer)
