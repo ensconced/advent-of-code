@@ -9,13 +9,13 @@ enum Item {
     Num(u32),
 }
 
-fn items_are_correctly_ordered(left_item: Item, right_item: Item) -> Option<bool> {
+fn items_are_correctly_ordered(left_item: Item, right_item: Item) -> Ordering {
     match left_item {
         Item::Num(left_num) => match right_item {
             Item::Num(right_num) => match left_num.cmp(&right_num) {
-                Ordering::Less => Some(true),
-                Ordering::Greater => Some(false),
-                Ordering::Equal => None,
+                Ordering::Less => Ordering::Less,
+                Ordering::Greater => Ordering::Greater,
+                Ordering::Equal => Ordering::Equal,
             },
             Item::List(right_vec) => pair_of_lists_is_correctly_ordered(vec![left_item], right_vec),
         },
@@ -28,22 +28,20 @@ fn items_are_correctly_ordered(left_item: Item, right_item: Item) -> Option<bool
     }
 }
 
-fn pair_of_lists_is_correctly_ordered(
-    left_packet: Vec<Item>,
-    right_packet: Vec<Item>,
-) -> Option<bool> {
+fn pair_of_lists_is_correctly_ordered(left_packet: Vec<Item>, right_packet: Vec<Item>) -> Ordering {
     for either_or_both in left_packet.into_iter().zip_longest(right_packet) {
         match either_or_both {
-            EitherOrBoth::Right(_) => return Some(true),
-            EitherOrBoth::Left(_) => return Some(false),
+            EitherOrBoth::Right(_) => return Ordering::Less,
+            EitherOrBoth::Left(_) => return Ordering::Greater,
             EitherOrBoth::Both(left_item, right_item) => {
-                if let Some(result) = items_are_correctly_ordered(left_item, right_item) {
-                    return Some(result);
+                let item_ordering = items_are_correctly_ordered(left_item, right_item);
+                if item_ordering != Ordering::Equal {
+                    return item_ordering;
                 }
             }
         }
     }
-    None
+    Ordering::Equal
 }
 
 fn maybe_take_digit(packet: &mut Peekable<impl Iterator<Item = char>>) -> Option<char> {
@@ -112,9 +110,7 @@ fn main() {
         .map(|(a, b)| pair_of_lists_is_correctly_ordered(a, b))
         .enumerate()
         .filter_map(|(pair_idx, is_correctly_ordered)| {
-            let result = is_correctly_ordered
-                .unwrap_or_else(|| panic!("no result for pair_idx {}", pair_idx + 1));
-            result.then_some(pair_idx + 1)
+            (is_correctly_ordered == Ordering::Less).then_some(pair_idx + 1)
         })
         .sum();
 
