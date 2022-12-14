@@ -9,6 +9,7 @@ enum Item {
     Num(u32),
 }
 
+#[derive(Clone)]
 struct Packet(Vec<Item>);
 
 impl PartialEq for Packet {
@@ -17,9 +18,19 @@ impl PartialEq for Packet {
     }
 }
 
-// impl PartialOrd for Packet {
-//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {}
-// }
+impl Eq for Packet {}
+
+impl PartialOrd for Packet {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(packet_ordering(&self.0, &other.0))
+    }
+}
+
+impl Ord for Packet {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
 
 fn items_are_correctly_ordered(left_item: &Item, right_item: &Item) -> Ordering {
     match left_item {
@@ -106,23 +117,40 @@ fn parse_packet(packet: &str) -> Packet {
 
 fn main() {
     let input = read_input();
-    let chunks = input.lines().chunks(3);
-    let packets: Vec<_> = chunks
-        .into_iter()
-        .map(|chunk| {
-            let lines: Vec<_> = chunk.into_iter().collect();
-            (parse_packet(lines[0]), parse_packet(lines[1]))
-        })
+    let mut packets: Vec<_> = input
+        .lines()
+        .filter(|line| !line.is_empty())
+        .map(parse_packet)
         .collect();
 
-    let part_1_answer: usize = packets
+    // part 1
+    let packet_pairs = packets.chunks(2);
+    let part_1_answer: usize = packet_pairs
         .into_iter()
-        .map(|(a, b)| packet_ordering(&a.0, &b.0))
+        .map(|chunk| packet_ordering(&chunk[0].0, &chunk[1].0))
         .enumerate()
         .filter_map(|(pair_idx, is_correctly_ordered)| {
             (is_correctly_ordered == Ordering::Less).then_some(pair_idx + 1)
         })
         .sum();
+    println!("part 1: {}", part_1_answer);
 
-    println!("part 1: {}", part_1_answer)
+    // part 2
+    let marker_packet_1 = parse_packet("[[2]]");
+    let marker_packet_2 = parse_packet("[[6]]");
+    packets.push(marker_packet_1.clone());
+    packets.push(marker_packet_2.clone());
+
+    packets.sort();
+
+    let marker_1_position = packets
+        .iter()
+        .find_position(|packet| packet == &&marker_packet_1);
+
+    let marker_2_position = packets
+        .iter()
+        .find_position(|packet| packet == &&marker_packet_2);
+
+    let part_2_answer = (marker_1_position.unwrap().0 + 1) * (marker_2_position.unwrap().0 + 1);
+    println!("part 2: {}", part_2_answer);
 }
