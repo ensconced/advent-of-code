@@ -3,33 +3,43 @@ use std::{cmp::Ordering, iter::Peekable};
 use itertools::{EitherOrBoth, Itertools};
 use utils::read_input;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Item {
     List(Vec<Item>),
     Num(u32),
 }
 
-fn items_are_correctly_ordered(left_item: Item, right_item: Item) -> Ordering {
+struct Packet(Vec<Item>);
+
+impl PartialEq for Packet {
+    fn eq(&self, other: &Self) -> bool {
+        packet_ordering(&self.0, &other.0).is_eq()
+    }
+}
+
+// impl PartialOrd for Packet {
+//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {}
+// }
+
+fn items_are_correctly_ordered(left_item: &Item, right_item: &Item) -> Ordering {
     match left_item {
         Item::Num(left_num) => match right_item {
-            Item::Num(right_num) => match left_num.cmp(&right_num) {
+            Item::Num(right_num) => match left_num.cmp(right_num) {
                 Ordering::Less => Ordering::Less,
                 Ordering::Greater => Ordering::Greater,
                 Ordering::Equal => Ordering::Equal,
             },
-            Item::List(right_vec) => pair_of_lists_is_correctly_ordered(vec![left_item], right_vec),
+            Item::List(right_vec) => packet_ordering(&[left_item.clone()], right_vec),
         },
         Item::List(left_vec) => match right_item {
-            Item::Num(right_num) => {
-                pair_of_lists_is_correctly_ordered(left_vec, vec![Item::Num(right_num)])
-            }
-            Item::List(right_vec) => pair_of_lists_is_correctly_ordered(left_vec, right_vec),
+            Item::Num(right_num) => packet_ordering(left_vec, &[Item::Num(*right_num)]),
+            Item::List(right_vec) => packet_ordering(left_vec, right_vec),
         },
     }
 }
 
-fn pair_of_lists_is_correctly_ordered(left_packet: Vec<Item>, right_packet: Vec<Item>) -> Ordering {
-    for either_or_both in left_packet.into_iter().zip_longest(right_packet) {
+fn packet_ordering(left_packet: &[Item], right_packet: &[Item]) -> Ordering {
+    for either_or_both in left_packet.iter().zip_longest(right_packet) {
         match either_or_both {
             EitherOrBoth::Right(_) => return Ordering::Less,
             EitherOrBoth::Left(_) => return Ordering::Greater,
@@ -89,9 +99,9 @@ fn maybe_take_item(packet: &mut Peekable<impl Iterator<Item = char>>) -> Option<
     })
 }
 
-fn parse_packet(packet: &str) -> Vec<Item> {
+fn parse_packet(packet: &str) -> Packet {
     let mut peekable_chars = packet.chars().peekable();
-    take_vec(&mut peekable_chars)
+    Packet(take_vec(&mut peekable_chars))
 }
 
 fn main() {
@@ -107,7 +117,7 @@ fn main() {
 
     let part_1_answer: usize = packets
         .into_iter()
-        .map(|(a, b)| pair_of_lists_is_correctly_ordered(a, b))
+        .map(|(a, b)| packet_ordering(&a.0, &b.0))
         .enumerate()
         .filter_map(|(pair_idx, is_correctly_ordered)| {
             (is_correctly_ordered == Ordering::Less).then_some(pair_idx + 1)
