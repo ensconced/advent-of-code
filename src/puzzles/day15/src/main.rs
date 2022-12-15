@@ -1,5 +1,5 @@
-use gcollections::ops::{Cardinality, Empty, Union};
-use interval::{interval_set::ToIntervalSet, Interval, IntervalSet};
+use gcollections::ops::{Cardinality, Difference, Empty, Union};
+use interval::{interval_set::ToIntervalSet, IntervalSet};
 use utils::read_input;
 
 #[derive(Debug)]
@@ -20,17 +20,25 @@ struct Sensor {
     closest_beacon: Coordinates,
 }
 
+fn remove(interval_set: IntervalSet<i32>, element: i32) -> IntervalSet<i32> {
+    interval_set.difference(&vec![(element, element)].to_interval_set())
+}
+
 impl Sensor {
     fn exclusion_zone_at_y(&self, y: i32) -> IntervalSet<i32> {
         let manhattan_distance = self.coordinates.manhattan_distance(&self.closest_beacon);
         let vertical_distance = i32::abs(self.coordinates.y - y);
-        if vertical_distance > manhattan_distance {
+        if vertical_distance >= manhattan_distance {
             IntervalSet::empty()
         } else {
             let horizontal_distance = manhattan_distance - vertical_distance;
             let start = self.coordinates.x - horizontal_distance;
             let end = self.coordinates.x + horizontal_distance;
-            vec![(start, end)].to_interval_set()
+            if y == self.closest_beacon.y {
+                remove(vec![(start, end)].to_interval_set(), self.closest_beacon.x)
+            } else {
+                vec![(start, end)].to_interval_set()
+            }
         }
     }
 }
@@ -71,23 +79,20 @@ fn parse_sensor(line: &str) -> Sensor {
     }
 }
 
+fn exclusion_zone(sensors: &[Sensor], y: i32) -> IntervalSet<i32> {
+    sensors.iter().fold(IntervalSet::empty(), |acc, sensor| {
+        let mut exclusion_zone = sensor.exclusion_zone_at_y(y);
+        if sensor.closest_beacon.y == y {
+            exclusion_zone = remove(exclusion_zone, sensor.closest_beacon.y);
+        }
+        acc.union(&exclusion_zone)
+    })
+}
+
 fn main() {
     let input = read_input();
-    let row_of_interest = 2000000;
-    let part_1_answer = input
-        .lines()
-        .map(parse_sensor)
-        .fold(IntervalSet::empty(), |acc, sensor| {
-            let mut exclusion_zone = sensor.exclusion_zone_at_y(row_of_interest);
-            if sensor.coordinates.y == row_of_interest {
-                exclusion_zone = exclusion_zone - sensor.coordinates.y;
-            }
-            if sensor.closest_beacon.y == row_of_interest {
-                exclusion_zone = exclusion_zone - sensor.closest_beacon.y;
-            }
-            acc.union(&exclusion_zone)
-        })
-        .size();
+    let sensors: Vec<_> = input.lines().map(parse_sensor).collect();
 
+    let part_1_answer = exclusion_zone(&sensors, 2000000).size();
     println!("part 1: {}", part_1_answer);
 }
