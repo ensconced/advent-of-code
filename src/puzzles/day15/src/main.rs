@@ -96,9 +96,9 @@ fn main() {
     let part_1_answer = exclusion_zone(&sensors, 2000000).size();
     println!("part 1: {}", part_1_answer);
 
-    let all_col_idxs = vec![(0, 4000000)].to_interval_set();
+    let all_col_idxs = vec![(0, 20)].to_interval_set();
     // part 2
-    (0..4000000).for_each(|y| {
+    (0..20).for_each(|y| {
         let possible_locations = all_col_idxs.difference(&exclusion_zone(&sensors, y));
         if let Some(x) = possible_locations.into_iter().next() {
             println!("{}", x.lower() * 4000000 + y);
