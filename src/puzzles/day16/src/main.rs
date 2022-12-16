@@ -2,11 +2,16 @@ use std::collections::{HashMap, HashSet};
 
 use utils::read_input;
 
+// TODO - fix score calculation - check on small input...
+
 // possible optimisations
-// - avoid going round in cycles pointlessly
-// - keep track of which valves might possibly be reachable from current valve - to give upper bound
-//   on possible score from going to a given valve, which could be compared to current score for
-//   paths to rule out some paths as definitely not worth pursuing
+// - avoid going round in cycles pointlessly... DONE
+// - track which paths are DONE and their final score - if not the max, remove from the pool
+// - keep track of which valves might possibly be reachable from current valve, and in how many
+//   steps, by pre-computing all shortest paths - to give upper bound on possible score from going
+//   to a given valve, which could be compared to current score for paths to rule out some paths as
+//   definitely not worth pursuing
+// - parallelize it?? but probably better algorithmic solutions...
 
 #[derive(Debug)]
 struct Valve<'a> {
@@ -16,48 +21,87 @@ struct Valve<'a> {
 }
 
 struct ValvePath<'a> {
+    steps_since_opening_valve: usize,
+    prev_steps: Vec<&'a str>,
     current_valve: &'a Valve<'a>,
-    opened_valves: HashSet<&'a str>,
+    valves_opened_when: HashMap<&'a str, u32>,
 }
 
 impl<'a> ValvePath<'a> {
     fn new(start_valve: &'a Valve) -> Self {
         Self {
+            steps_since_opening_valve: 0,
+            prev_steps: vec![],
             current_valve: start_valve,
-            opened_valves: HashSet::new(),
+            valves_opened_when: HashMap::new(),
         }
     }
 
+    fn end_cycle_length(&self) -> Option<usize> {
+        let mut seen = HashSet::new();
+        for (idx, valve_name) in self.prev_steps.iter().rev().enumerate() {
+            if seen.contains(valve_name) {
+                return Some(idx);
+            }
+            seen.insert(valve_name);
+        }
+        None
+    }
+
+    fn ends_with_pointless_cycle(&self) -> bool {
+        self.end_cycle_length().map_or(false, |cycle_length| {
+            cycle_length <= self.steps_since_opening_valve
+        })
+    }
+
     /// Get all the possible ways of extending the path within one minute.
-    fn extend(mut self, valve_lookup: &'a HashMap<&str, Valve>) -> Vec<ValvePath<'a>> {
-        // for each neighbour, include paths:
-        // - where we move to the neighbour
-        // - if current valve flow_rate > 0, and current valve is not already on, where we turn on current valve
+    fn all_possible_extensions(
+        mut self,
+        minute: u32,
+        valve_lookup: &'a HashMap<&str, Valve>,
+    ) -> Vec<ValvePath<'a>> {
         let mut extended_paths: Vec<_> = self
             .current_valve
             .neighbours
             .iter()
-            .map(|neighb| ValvePath {
-                current_valve: valve_lookup.get(neighb).unwrap(),
-                opened_valves: self.opened_valves.clone(),
+            .map(|neighb| {
+                let mut prev_steps = self.prev_steps.clone();
+                prev_steps.push(self.current_valve.name);
+                ValvePath {
+                    steps_since_opening_valve: self.steps_since_opening_valve + 1,
+                    prev_steps,
+                    current_valve: valve_lookup.get(neighb).unwrap(),
+                    valves_opened_when: self.valves_opened_when.clone(),
+                }
             })
+            .filter(|path| !path.ends_with_pointless_cycle())
             .collect();
 
-        if !self.opened_valves.contains(self.current_valve.name) {
-            self.opened_valves.insert(self.current_valve.name);
+        // This valve may already be opened. If so, this is equivalent to doing nothing for this step.
+        if !self
+            .valves_opened_when
+            .contains_key(self.current_valve.name)
+        {
+            self.valves_opened_when
+                .insert(self.current_valve.name, minute);
             extended_paths.push(ValvePath {
+                steps_since_opening_valve: 0,
+                prev_steps: self.prev_steps,
                 current_valve: self.current_valve,
-                opened_valves: self.opened_valves,
+                valves_opened_when: self.valves_opened_when,
             });
         }
-
         extended_paths
     }
 
     fn score(&self, valve_lookup: &HashMap<&str, Valve>) -> u32 {
-        self.opened_valves
+        self.valves_opened_when
             .iter()
-            .map(|valve_name| valve_lookup.get(valve_name).unwrap().flow_rate)
+            .map(|(valve_name, minute_opened)| {
+                let flow_rate = valve_lookup.get(valve_name).unwrap().flow_rate;
+                let valve_open_duration = 30 - 1 - minute_opened;
+                flow_rate * valve_open_duration
+            })
             .sum()
     }
 }
@@ -93,7 +137,10 @@ fn main() {
             println!("minute: {minute}, found paths: {}", acc.len());
 
             acc.into_iter()
-                .flat_map(|path| path.extend(&valve_lookup).into_iter())
+                .flat_map(|path| {
+                    path.all_possible_extensions(minute, &valve_lookup)
+                        .into_iter()
+                })
                 .collect()
         })
         .iter()
