@@ -25,7 +25,11 @@ fn remove(interval_set: IntervalSet<i64>, element: i64) -> IntervalSet<i64> {
 }
 
 impl Sensor {
-    fn exclusion_zone_at_y(&self, y: i64) -> IntervalSet<i64> {
+    fn area_where_beacon_isnt(
+        &self,
+        y: i64,
+        exclude_position_closest_beacon: bool,
+    ) -> IntervalSet<i64> {
         let manhattan_distance = self.coordinates.manhattan_distance(&self.closest_beacon);
         let vertical_distance = i64::abs(self.coordinates.y - y);
         if vertical_distance >= manhattan_distance {
@@ -34,7 +38,7 @@ impl Sensor {
             let horizontal_distance = manhattan_distance - vertical_distance;
             let start = self.coordinates.x - horizontal_distance;
             let end = self.coordinates.x + horizontal_distance;
-            if y == self.closest_beacon.y {
+            if y == self.closest_beacon.y && exclude_position_closest_beacon {
                 remove(vec![(start, end)].to_interval_set(), self.closest_beacon.x)
             } else {
                 vec![(start, end)].to_interval_set()
@@ -79,12 +83,13 @@ fn parse_sensor(line: &str) -> Sensor {
     }
 }
 
-fn exclusion_zone(sensors: &[Sensor], y: i64) -> IntervalSet<i64> {
+fn combined_area_where_beacon_isnt(
+    sensors: &[Sensor],
+    y: i64,
+    exclude_position_closest_beacon: bool,
+) -> IntervalSet<i64> {
     sensors.iter().fold(IntervalSet::empty(), |acc, sensor| {
-        let mut exclusion_zone = sensor.exclusion_zone_at_y(y);
-        if sensor.closest_beacon.y == y {
-            exclusion_zone = remove(exclusion_zone, sensor.closest_beacon.y);
-        }
+        let exclusion_zone = sensor.area_where_beacon_isnt(y, exclude_position_closest_beacon);
         acc.union(&exclusion_zone)
     })
 }
@@ -93,15 +98,19 @@ fn main() {
     let input = read_input();
     let sensors: Vec<_> = input.lines().map(parse_sensor).collect();
 
-    let part_1_answer = exclusion_zone(&sensors, 2000000).size();
+    let part_1_answer = combined_area_where_beacon_isnt(&sensors, 2000000, true).size();
     println!("part 1: {}", part_1_answer);
 
-    let all_col_idxs = vec![(0, 20)].to_interval_set();
-    // part 2
-    (0..20).for_each(|y| {
-        let possible_locations = all_col_idxs.difference(&exclusion_zone(&sensors, y));
+    // part 2 - this is kind of a  stupid slow way of doing it...but it still only takes a few seconds (when compiled with --release)
+    let search_limit = 4000000;
+    let all_col_idxs = vec![(0, search_limit)].to_interval_set();
+
+    for y in 0..search_limit {
+        let possible_locations =
+            all_col_idxs.difference(&combined_area_where_beacon_isnt(&sensors, y, false));
         if let Some(x) = possible_locations.into_iter().next() {
-            println!("{}", x.lower() * 4000000 + y);
+            println!("part 2: {}", x.lower() * 4000000 + y);
+            break;
         }
-    });
+    }
 }
