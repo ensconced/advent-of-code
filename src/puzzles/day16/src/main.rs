@@ -6,7 +6,7 @@ use utils::read_input;
 
 use crate::shortest_paths::floyd_warshall_shortest_paths;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Valve<'a> {
     name: &'a str,
     flow_rate: u32,
@@ -23,12 +23,12 @@ impl<'a> Valve<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct ValvePath<'a> {
     steps_since_opening_valve: usize,
     prev_steps: Vec<&'a str>,
     current_valve: &'a Valve<'a>,
-    valves_opened_when: HashMap<&'a str, u32>,
+    open_valves: HashSet<&'a str>,
     done: bool,
     score: u32,
 }
@@ -39,7 +39,7 @@ impl<'a> ValvePath<'a> {
             steps_since_opening_valve: 0,
             prev_steps: vec![],
             current_valve: start_valve,
-            valves_opened_when: HashMap::new(),
+            open_valves: HashSet::new(),
             done: false,
             score: 0,
         }
@@ -65,43 +65,40 @@ impl<'a> ValvePath<'a> {
                 .current_valve
                 .neighbours
                 .iter()
-                .map(|neighb| {
+                .map(|neighbour| {
                     let mut prev_steps = self.prev_steps.clone();
                     prev_steps.push(self.current_valve.name);
                     ValvePath {
                         steps_since_opening_valve: self.steps_since_opening_valve + 1,
                         prev_steps,
-                        current_valve: valve_lookup.get(neighb).unwrap(),
-                        valves_opened_when: self.valves_opened_when.clone(),
+                        current_valve: valve_lookup.get(neighbour).unwrap(),
+                        open_valves: self.open_valves.clone(),
                         done: false,
                         score: self.score,
                     }
                 })
-                .filter(|path| !path.ends_with_pointless_cycle())
+                // .filter(|path| !path.ends_with_pointless_cycle())
                 .collect();
 
-            if self
-                .valves_opened_when
-                .contains_key(self.current_valve.name)
-            {
-                extended_paths.push(ValvePath {
-                    steps_since_opening_valve: self.steps_since_opening_valve,
-                    prev_steps: self.prev_steps,
-                    current_valve: self.current_valve,
-                    valves_opened_when: self.valves_opened_when,
-                    done: true,
-                    score: self.score,
-                });
+            if self.open_valves.contains(self.current_valve.name) {
+                // extended_paths.push(ValvePath {
+                //     steps_since_opening_valve: self.steps_since_opening_valve,
+                //     prev_steps: self.prev_steps,
+                //     current_valve: self.current_valve,
+                //     open_valves: self.open_valves,
+                //     done: true,
+                //     score: self.score,
+                // });
             } else {
-                self.valves_opened_when
-                    .insert(self.current_valve.name, minute);
+                let score = self.score + self.current_valve.flow_rate * (30 - minute);
+                self.open_valves.insert(self.current_valve.name);
                 extended_paths.push(ValvePath {
                     steps_since_opening_valve: 0,
                     prev_steps: self.prev_steps,
                     current_valve: self.current_valve,
-                    valves_opened_when: self.valves_opened_when,
+                    open_valves: self.open_valves,
                     done: false,
-                    score: self.score + self.current_valve.flow_rate * (30 - minute),
+                    score,
                 });
             }
             extended_paths
@@ -114,11 +111,11 @@ impl<'a> ValvePath<'a> {
         shortest_paths: &ShortestPaths,
         minute: u32,
     ) -> u32 {
-        let scores_we_may_be_able_to_get = shortest_paths
+        let upper_bound_score_for_reachable_valves = shortest_paths
             .all_shortest_paths_from(self.current_valve.name)
             .unwrap()
             .iter()
-            .filter(|(valve_name, _)| !self.valves_opened_when.contains_key(**valve_name))
+            .filter(|(valve_name, _)| !self.open_valves.contains(**valve_name))
             .map(|(valve_name, path_length)| {
                 let min_minute_to_open_valve = minute + path_length + 1;
                 let max_minutes_of_flow = 30 - min_minute_to_open_valve;
@@ -126,7 +123,7 @@ impl<'a> ValvePath<'a> {
                 flow_rate * max_minutes_of_flow
             })
             .sum::<u32>();
-        scores_we_may_be_able_to_get + self.score
+        upper_bound_score_for_reachable_valves + self.score
     }
 }
 
@@ -164,12 +161,12 @@ impl<'a> PathCollection<'a> {
     ) {
         let old_paths = std::mem::take(&mut self.paths);
         for old_path in old_paths.into_iter() {
-            for extended_path in old_path.all_possible_extensions(minute, valve_lookup) {
+            let extended_paths = old_path.all_possible_extensions(minute, valve_lookup);
+            for extended_path in extended_paths {
                 let score_upper_bound =
                     extended_path.final_score_upper_bound(valve_lookup, shortest_paths, minute);
                 if score_upper_bound > self.max_score {
                     let extended_path_score = extended_path.score;
-                    dbg!(&extended_path);
                     self.paths.push(extended_path);
                     self.max_score = u32::max(self.max_score, extended_path_score);
                 }
@@ -192,4 +189,197 @@ fn main() {
 
     let part_1_answer = paths.max_score;
     println!("part 1: {part_1_answer}");
+}
+
+#[test]
+fn first_minute() {
+    let input = read_input();
+    let valve_lookup: HashMap<_, _> = input.lines().map(parse_valve).collect();
+    let shortest_paths = floyd_warshall_shortest_paths(&valve_lookup);
+
+    let start_valve = valve_lookup.get("AA").unwrap();
+    let original_path = ValvePath::new(start_valve);
+    assert_eq!(
+        original_path,
+        ValvePath {
+            steps_since_opening_valve: 0,
+            prev_steps: vec![],
+            current_valve: &Valve {
+                name: "AA",
+                flow_rate: 0,
+                neighbours: HashSet::from(["DD", "II", "BB"])
+            },
+            open_valves: HashSet::new(),
+            done: false,
+            score: 0,
+        }
+    );
+
+    // move to valve D...
+
+    let expected_second_stage = ValvePath {
+        steps_since_opening_valve: 1,
+        prev_steps: vec!["AA"],
+        current_valve: &Valve {
+            name: "DD",
+            flow_rate: 20,
+            neighbours: HashSet::from(["CC", "AA", "EE"]),
+        },
+        open_valves: HashSet::new(),
+        done: false,
+        score: 0,
+    };
+
+    assert!(original_path
+        .all_possible_extensions(1, &valve_lookup)
+        .into_iter()
+        .any(|el| el == expected_second_stage));
+
+    // open valve D...
+
+    let expected_third_stage = ValvePath {
+        steps_since_opening_valve: 0,
+        prev_steps: vec!["AA"],
+        current_valve: &Valve {
+            name: "DD",
+            flow_rate: 20,
+            neighbours: HashSet::from(["CC", "AA", "EE"]),
+        },
+        open_valves: HashSet::from(["DD"]),
+        done: false,
+        score: 20 * 28,
+    };
+
+    let all_possible_third_stages = expected_second_stage.all_possible_extensions(2, &valve_lookup);
+    assert!(all_possible_third_stages
+        .into_iter()
+        .any(|el| el == expected_third_stage));
+
+    // move to valve C...
+
+    let expected_fourth_stage = ValvePath {
+        steps_since_opening_valve: 1,
+        prev_steps: vec!["AA", "DD"],
+        current_valve: &Valve {
+            name: "CC",
+            flow_rate: 2,
+            neighbours: HashSet::from(["DD", "BB"]),
+        },
+        open_valves: HashSet::from(["DD"]),
+        done: false,
+        score: 20 * 28,
+    };
+
+    let all_possible_fourth_stages = expected_third_stage.all_possible_extensions(3, &valve_lookup);
+    assert!(all_possible_fourth_stages
+        .into_iter()
+        .any(|el| el == expected_fourth_stage));
+
+    // move to valve B...
+
+    let expected_fifth_stage = ValvePath {
+        steps_since_opening_valve: 2,
+        prev_steps: vec!["AA", "DD", "CC"],
+        current_valve: &Valve {
+            name: "BB",
+            flow_rate: 13,
+            neighbours: HashSet::from(["CC", "AA"]),
+        },
+        open_valves: HashSet::from(["DD"]),
+        done: false,
+        score: 20 * 28,
+    };
+
+    let all_possible_fourth_stages =
+        expected_fourth_stage.all_possible_extensions(4, &valve_lookup);
+    assert!(all_possible_fourth_stages
+        .into_iter()
+        .any(|el| el == expected_fifth_stage));
+
+    // open valve B...
+
+    let expected_sixth_stage = ValvePath {
+        steps_since_opening_valve: 0,
+        prev_steps: vec!["AA", "DD", "CC"],
+        current_valve: &Valve {
+            name: "BB",
+            flow_rate: 13,
+            neighbours: HashSet::from(["CC", "AA"]),
+        },
+        open_valves: HashSet::from(["DD", "BB"]),
+        done: false,
+        score: 20 * 28 + 13 * 25,
+    };
+
+    let all_possible_sixth_stages = expected_fifth_stage.all_possible_extensions(5, &valve_lookup);
+    assert!(all_possible_sixth_stages
+        .into_iter()
+        .any(|el| el == expected_sixth_stage));
+
+    // move to valve A
+
+    let expected_seventh_stage = ValvePath {
+        steps_since_opening_valve: 1,
+        prev_steps: vec!["AA", "DD", "CC", "BB"],
+        current_valve: &Valve {
+            name: "AA",
+            flow_rate: 0,
+            neighbours: HashSet::from(["DD", "II", "BB"]),
+        },
+        open_valves: HashSet::from(["DD", "BB"]),
+        done: false,
+        score: 20 * 28 + 13 * 25,
+    };
+
+    let all_possible_seventh_stages =
+        expected_sixth_stage.all_possible_extensions(6, &valve_lookup);
+    assert!(all_possible_seventh_stages
+        .into_iter()
+        .any(|el| el == expected_seventh_stage));
+
+    // move to valve II
+
+    let expected_eighth_stage = ValvePath {
+        steps_since_opening_valve: 2,
+        prev_steps: vec!["AA", "DD", "CC", "BB", "AA"],
+        current_valve: &Valve {
+            name: "II",
+            flow_rate: 0,
+            neighbours: HashSet::from(["AA", "JJ"]),
+        },
+        open_valves: HashSet::from(["DD", "BB"]),
+        done: false,
+        score: 20 * 28 + 13 * 25,
+    };
+
+    let all_possible_eighth_stages =
+        expected_seventh_stage.all_possible_extensions(7, &valve_lookup);
+    assert!(all_possible_eighth_stages
+        .into_iter()
+        .any(|el| el == expected_eighth_stage));
+
+    // move to valve AA
+
+    let expected_ninth_stage = ValvePath {
+        steps_since_opening_valve: 3,
+        prev_steps: vec!["AA", "DD", "CC", "BB", "AA", "II"],
+        current_valve: &Valve {
+            name: "AA",
+            flow_rate: 0,
+            neighbours: HashSet::from(["DD", "II", "BB"]),
+        },
+        open_valves: HashSet::from(["DD", "BB"]),
+        done: false,
+        score: 20 * 28 + 13 * 25,
+    };
+
+    let all_possible_h_stages = expected_eighth_stage.all_possible_extensions(8, &valve_lookup);
+    assert!(all_possible_h_stages
+        .into_iter()
+        .any(|el| el == expected_ninth_stage));
+
+    // original_path
+    //     .all_possible_extensions(1, &valve_lookup)
+    //     .into_iter()
+    //     .any(|valve_path| valve_path == ValvePath {});
 }
