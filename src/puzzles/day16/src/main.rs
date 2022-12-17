@@ -58,9 +58,7 @@ impl<'a> ValvePath<'a> {
         minute: u32,
         valve_lookup: &'a HashMap<&str, Valve>,
     ) -> Vec<ValvePath<'a>> {
-        let next_score = self.next_score(valve_lookup);
         if self.done {
-            self.score = next_score;
             vec![self]
         } else {
             let mut extended_paths: Vec<_> = self
@@ -76,7 +74,7 @@ impl<'a> ValvePath<'a> {
                         current_valve: valve_lookup.get(neighb).unwrap(),
                         valves_opened_when: self.valves_opened_when.clone(),
                         done: false,
-                        score: next_score,
+                        score: self.score,
                     }
                 })
                 .filter(|path| !path.ends_with_pointless_cycle())
@@ -92,7 +90,7 @@ impl<'a> ValvePath<'a> {
                     current_valve: self.current_valve,
                     valves_opened_when: self.valves_opened_when,
                     done: true,
-                    score: next_score,
+                    score: self.score,
                 });
             } else {
                 self.valves_opened_when
@@ -103,21 +101,11 @@ impl<'a> ValvePath<'a> {
                     current_valve: self.current_valve,
                     valves_opened_when: self.valves_opened_when,
                     done: false,
-                    score: next_score,
+                    score: self.score + self.current_valve.flow_rate * (30 - minute),
                 });
             }
             extended_paths
         }
-    }
-
-    fn next_score(&self, valve_lookup: &'a HashMap<&'a str, Valve>) -> u32 {
-        let score_for_this_minute = self
-            .valves_opened_when
-            .keys()
-            .map(|open_valve_name| valve_lookup.get(open_valve_name).unwrap().flow_rate)
-            .sum::<u32>();
-
-        self.score + score_for_this_minute
     }
 
     fn final_score_upper_bound(
