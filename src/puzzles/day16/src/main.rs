@@ -1,9 +1,13 @@
+mod shortest_paths;
 use std::collections::{HashMap, HashSet};
 
+use shortest_paths::ShortestPaths;
 use utils::read_input;
 
+use crate::shortest_paths::floyd_warshall_shortest_paths;
+
 #[derive(Debug)]
-struct Valve<'a> {
+pub struct Valve<'a> {
     name: &'a str,
     flow_rate: u32,
     neighbours: HashSet<&'a str>,
@@ -138,76 +142,6 @@ impl<'a> ValvePath<'a> {
     }
 }
 
-#[derive(Debug)]
-struct ShortestPaths<'a>(HashMap<&'a &'a str, HashMap<&'a &'a str, u32>>);
-
-impl<'a> ShortestPaths<'a> {
-    fn all_shortest_paths_from(&'a self, source: &'a str) -> Option<&'a HashMap<&&str, u32>> {
-        self.0.get(&source)
-    }
-
-    fn shortest_path(&self, source: &str, target: &str) -> Option<u32> {
-        self.0
-            .get(&source)
-            .and_then(|inner_map| inner_map.get(&target))
-            .cloned()
-    }
-
-    fn initialise(valve_lookup: &'a HashMap<&'a str, Valve>) -> Self {
-        Self(
-            valve_lookup
-                .iter()
-                .map(|(valve_name, valve)| {
-                    (
-                        valve_name,
-                        valve
-                            .neighbours
-                            .iter()
-                            .map(|neighbour_name| (neighbour_name, 1))
-                            .collect(),
-                    )
-                })
-                .collect(),
-        )
-    }
-
-    fn include_valve(
-        &self,
-        valve: &'a Valve,
-        valve_lookup: &'a HashMap<&'a str, Valve>,
-    ) -> ShortestPaths<'a> {
-        Self(
-            valve_lookup
-                .keys()
-                .map(|source_valve_name| {
-                    let inner_hashmap = valve_lookup
-                        .keys()
-                        .filter_map(|target_valve_name| {
-                            let shortest_path_not_using_k =
-                                self.shortest_path(source_valve_name, target_valve_name);
-
-                            let shortest_path_from_source_to_k =
-                                self.shortest_path(source_valve_name, valve.name);
-                            let shortest_path_from_k_to_target =
-                                self.shortest_path(valve.name, target_valve_name);
-                            let shortest_path_using_k = shortest_path_from_source_to_k
-                                .zip(shortest_path_from_k_to_target)
-                                .map(|(a, b)| a + b);
-
-                            shortest_path_not_using_k
-                                .into_iter()
-                                .chain(shortest_path_using_k)
-                                .min()
-                                .map(|min_score| (target_valve_name, min_score))
-                        })
-                        .collect();
-                    (source_valve_name, inner_hashmap)
-                })
-                .collect(),
-        )
-    }
-}
-
 fn parse_valve(line: &str) -> (&str, Valve) {
     let parts: Vec<_> = line.split_ascii_whitespace().collect();
     let name = parts[1];
@@ -219,21 +153,12 @@ fn parse_valve(line: &str) -> (&str, Valve) {
     (name, Valve::new(name, flow_rate, neighbours))
 }
 
-fn floyd_warshall_shortest_paths<'a>(
-    valve_lookup: &'a HashMap<&'a str, Valve>,
-) -> ShortestPaths<'a> {
-    valve_lookup
-        .values()
-        .fold(ShortestPaths::initialise(valve_lookup), |acc, valve| {
-            acc.include_valve(valve, valve_lookup)
-        })
-}
-
 struct PathCollection<'a> {
     paths: Vec<ValvePath<'a>>,
     max_score: u32,
 }
 
+// TODO - use priority queue?
 impl<'a> PathCollection<'a> {
     fn new(start_valve: &'a Valve) -> Self {
         let path = ValvePath::new(start_valve);
@@ -241,6 +166,26 @@ impl<'a> PathCollection<'a> {
         Self {
             paths: vec![path],
             max_score: score,
+        }
+    }
+
+    fn extend(
+        &mut self,
+        shortest_paths: &ShortestPaths,
+        valve_lookup: &'a HashMap<&'a str, Valve>,
+        minute: u32,
+    ) {
+        let old_paths = std::mem::take(&mut self.paths);
+        for old_path in old_paths.into_iter() {
+            for extended_path in old_path.all_possible_extensions(minute, valve_lookup) {
+                let score_upper_bound =
+                    extended_path.final_score_upper_bound(valve_lookup, shortest_paths, minute);
+                if score_upper_bound > self.max_score {
+                    let extended_path_score = extended_path.score;
+                    self.paths.push(extended_path);
+                    self.max_score = u32::max(self.max_score, extended_path_score);
+                }
+            }
         }
     }
 }
@@ -251,39 +196,12 @@ fn main() {
     let shortest_paths = floyd_warshall_shortest_paths(&valve_lookup);
 
     let start_valve = valve_lookup.get("AA").unwrap();
-    let starting_possible_paths = PathCollection::new(start_valve);
-    let all_paths = (1..=30).fold(starting_possible_paths, |acc, minute| {
-        println!("minute: {minute}, found paths: {}", acc.paths.len());
-        let new_paths: Vec<_> = acc
-            .paths
-            .into_iter()
-            .flat_map(|path| {
-                path.all_possible_extensions(minute, &valve_lookup)
-                    .into_iter()
-                    .filter(|new_path| {
-                        let score_upper_bound = new_path.final_score_upper_bound(
-                            &valve_lookup,
-                            &shortest_paths,
-                            minute,
-                        );
-                        score_upper_bound > acc.max_score
-                    })
-            })
-            .collect();
+    let mut paths = PathCollection::new(start_valve);
+    for minute in 1..=30 {
+        println!("minute: {minute}");
+        paths.extend(&shortest_paths, &valve_lookup, minute);
+    }
 
-        let new_max_score = new_paths.iter().map(|path| path.score).max().unwrap();
-
-        PathCollection {
-            paths: new_paths,
-            max_score: new_max_score,
-        }
-    });
-    let best_path = all_paths
-        .paths
-        .iter()
-        .max_by_key(|path| path.score)
-        .unwrap();
-
-    let part_1_answer = best_path.score;
+    let part_1_answer = paths.max_score;
     println!("part 1: {part_1_answer}");
 }
