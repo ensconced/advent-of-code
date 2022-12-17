@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use utils::read_input;
 
@@ -17,7 +17,17 @@ use utils::read_input;
 struct Valve<'a> {
     name: &'a str,
     flow_rate: u32,
-    neighbours: Vec<&'a str>,
+    neighbours: HashSet<&'a str>,
+}
+
+impl<'a> Valve<'a> {
+    fn new(name: &'a str, flow_rate: &str, neighbours: impl Iterator<Item = &'a str>) -> Self {
+        Self {
+            name,
+            flow_rate: flow_rate.parse().unwrap(),
+            neighbours: neighbours.collect(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -119,23 +129,77 @@ fn parse_valve(line: &str) -> (&str, Valve) {
         .strip_prefix("rate=")
         .and_then(|rhs| rhs.strip_suffix(';'))
         .unwrap();
-    let neighbours = parts[9..]
+    let neighbours = parts[9..].iter().map(|neighb| neighb.trim_end_matches(','));
+    (name, Valve::new(name, flow_rate, neighbours))
+}
+
+type PathLengthLookup<'a> = HashMap<&'a &'a str, HashMap<&'a &'a str, u32>>;
+
+fn include_valve<'a>(
+    valve: &'a Valve,
+    valve_lookup: &'a HashMap<&'a str, Valve>,
+    shortest_paths: PathLengthLookup<'a>,
+) -> PathLengthLookup<'a> {
+    valve_lookup
+        .keys()
+        .map(|source_valve_name| {
+            let inner_hashmap = valve_lookup
+                .keys()
+                .filter_map(|target_valve_name| {
+                    let shortest_path_not_using_k = shortest_paths
+                        .get(source_valve_name)
+                        .and_then(|inner| inner.get(target_valve_name));
+                    let shortest_path_from_source_to_k = shortest_paths
+                        .get(source_valve_name)
+                        .and_then(|inner| inner.get(&valve.name));
+                    let shortest_path_from_k_to_target = shortest_paths
+                        .get(&valve.name)
+                        .and_then(|inner| inner.get(target_valve_name));
+                    let shortest_path_using_k = shortest_path_from_source_to_k
+                        .zip(shortest_path_from_k_to_target)
+                        .map(|(a, b)| a + b);
+                    let score = shortest_path_not_using_k
+                        .cloned()
+                        .into_iter()
+                        .chain(shortest_path_using_k)
+                        .min();
+                    score.map(|asdf| (target_valve_name, asdf))
+                })
+                .collect();
+            (source_valve_name, inner_hashmap)
+        })
+        .collect()
+}
+
+fn all_pairs_shortest_paths<'a>(valve_lookup: &'a HashMap<&'a str, Valve>) -> PathLengthLookup<'a> {
+    // Floyd-Warshall algorithm
+    let initial_shortest_path_estimates: PathLengthLookup = valve_lookup
         .iter()
-        .map(|neighb| neighb.trim_end_matches(','))
+        .map(|(valve_name, valve)| {
+            (
+                valve_name,
+                valve
+                    .neighbours
+                    .iter()
+                    .map(|neighbour_name| (neighbour_name, 1))
+                    .collect(),
+            )
+        })
         .collect();
-    (
-        name,
-        Valve {
-            name,
-            flow_rate: flow_rate.parse().unwrap(),
-            neighbours,
-        },
-    )
+
+    valve_lookup
+        .values()
+        .fold(initial_shortest_path_estimates, |acc, valve| {
+            include_valve(valve, valve_lookup, acc)
+        })
 }
 
 fn main() {
     let input = read_input();
     let valve_lookup: HashMap<_, _> = input.lines().map(parse_valve).collect();
+    let shortest_paths = all_pairs_shortest_paths(&valve_lookup);
+    dbg!(&shortest_paths);
+
     let start_valve = valve_lookup.get("AA").unwrap();
     let starting_possible_paths = vec![ValvePath::new(start_valve)];
     let all_paths = (1..=30).fold(starting_possible_paths, |acc, minute| {
