@@ -146,7 +146,6 @@ struct PathCollection<'a> {
     max_score: u32,
 }
 
-// TODO - use priority queue?
 impl<'a> PathCollection<'a> {
     fn new(start_valve: &'a Valve) -> Self {
         let path = ValvePath::new(start_valve);
@@ -170,6 +169,7 @@ impl<'a> PathCollection<'a> {
                     extended_path.final_score_upper_bound(valve_lookup, shortest_paths, minute);
                 if score_upper_bound > self.max_score {
                     let extended_path_score = extended_path.score;
+                    dbg!(&extended_path);
                     self.paths.push(extended_path);
                     self.max_score = u32::max(self.max_score, extended_path_score);
                 }
