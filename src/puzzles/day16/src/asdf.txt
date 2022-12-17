@@ -1,0 +1,15 @@
+move to "DD"
+open "DD"
+move to "CC"
+move to "BB"
+open "BB"
+move to "AA"
+move to "II"
+move to "JJ"
+open "JJ"
+move to "II"
+me - open "II", best - move to "AA"
+
+DD: 2,
+BB: 5,
+JJ: 9
