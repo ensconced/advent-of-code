@@ -124,19 +124,17 @@ impl<'a> ValvePath<'a> {
     ) -> u32 {
         let scores_we_may_be_able_to_get = shortest_paths
             .all_shortest_paths_from(self.current_valve.name)
-            .map(|hashmap| {
-                hashmap
-                    .iter()
-                    .filter(|(valve_name, _)| !self.valves_opened_when.contains_key(**valve_name))
-                    .map(|(valve_name, path_length)| {
-                        let min_minute_to_open_valve = minute + path_length + 1;
-                        let max_minutes_of_flow = 30 - min_minute_to_open_valve;
-                        let flow_rate = valve_lookup.get(*valve_name).unwrap().flow_rate;
-                        flow_rate * max_minutes_of_flow
-                    })
-                    .sum::<u32>()
-            });
-        scores_we_may_be_able_to_get.unwrap_or(0) + self.score
+            .unwrap()
+            .iter()
+            .filter(|(valve_name, _)| !self.valves_opened_when.contains_key(**valve_name))
+            .map(|(valve_name, path_length)| {
+                let min_minute_to_open_valve = minute + path_length + 1;
+                let max_minutes_of_flow = 30 - min_minute_to_open_valve;
+                let flow_rate = valve_lookup.get(*valve_name).unwrap().flow_rate;
+                flow_rate * max_minutes_of_flow
+            })
+            .sum::<u32>();
+        scores_we_may_be_able_to_get + self.score
     }
 }
 
