@@ -1,6 +1,6 @@
 mod parser;
 mod shortest_paths;
-mod single_path;
+mod valve_path;
 mod valve_thread;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
@@ -8,7 +8,7 @@ use shortest_paths::ShortestPaths;
 use utils::read_input;
 
 use crate::{
-    parser::parse_valve, shortest_paths::floyd_warshall_shortest_paths, single_path::ValvePath,
+    parser::parse_valve, shortest_paths::floyd_warshall_shortest_paths, valve_path::ValvePath,
 };
 
 #[derive(Debug)]
