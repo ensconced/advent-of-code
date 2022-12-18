@@ -113,13 +113,20 @@ impl<'a> ValvePath<'a> {
         shortest_paths: &ShortestPaths,
         minute: u32,
     ) -> u32 {
-        let upper_bound = shortest_paths
+        let mut reachable_closed_valves: Vec<_> = shortest_paths
             .all_shortest_paths_from(self.current_valve.name)
             .unwrap()
             .iter()
             .filter(|(valve_name, _)| !self.open_valves.contains(**valve_name))
-            .map(|(valve_name, path_length)| {
-                let min_minute_to_open_valve = minute + path_length + 1;
+            .collect();
+
+        reachable_closed_valves.sort_by_key(|(_, distance)| *distance);
+
+        let upper_bound = reachable_closed_valves
+            .into_iter()
+            .enumerate()
+            .map(|(idx, (valve_name, path_length))| {
+                let min_minute_to_open_valve = minute + path_length + 1 + idx as u32;
                 let max_minutes_of_flow = MINUTES - min_minute_to_open_valve;
                 let flow_rate = valve_lookup.get(*valve_name).unwrap().flow_rate;
                 flow_rate * max_minutes_of_flow
