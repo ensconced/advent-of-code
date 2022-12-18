@@ -199,20 +199,20 @@ impl<'a> ValvePath<'a> {
         current_score: u32,
         minute: u32,
     ) -> u32 {
-        let upper_bound = shortest_paths
+        let remaining_score_to_accrue = shortest_paths
             .all_shortest_paths_from(current_valve_name)
             .unwrap()
             .iter()
             .filter(|(valve_name, _)| !open_valves.contains(*valve_name))
             .enumerate()
             .map(|(idx, (valve_name, path_length))| {
-                let min_minute_to_open_valve = minute + path_length + 1 + idx as u32;
+                let min_minute_to_open_valve = minute + path_length + 1; //  + idx as u32;
                 let max_minutes_of_flow = MINUTES - min_minute_to_open_valve;
                 let flow_rate = valve_lookup.get(*valve_name).unwrap().flow_rate;
                 flow_rate * max_minutes_of_flow
             })
             .sum::<u32>();
-        upper_bound + current_score
+        remaining_score_to_accrue + current_score
     }
 }
 
@@ -277,20 +277,25 @@ impl<'a> PathCollection<'a> {
         self.max_score = 0;
         let mut old_paths = std::mem::take(&mut self.paths);
         while let Some(old_path) = old_paths.pop() {
-            // if old_path.score_upper_bound > self.max_score {
-            let extended_paths =
-                old_path.all_possible_extensions(minute, valve_lookup, shortest_paths);
-            for extended_path in extended_paths {
-                if extended_path.score_upper_bound > self.max_score {
-                    let extended_path_score = extended_path.score;
-                    self.paths.push(extended_path);
-                    self.max_score = u32::max(self.max_score, extended_path_score);
+            let old_upper_bound = old_path.score_upper_bound;
+            if old_path.score_upper_bound > self.max_score {
+                let extended_paths =
+                    old_path.all_possible_extensions(minute, valve_lookup, shortest_paths);
+
+                assert!(extended_paths
+                    .iter()
+                    .all(|ext| ext.score_upper_bound <= old_upper_bound));
+
+                for extended_path in extended_paths {
+                    if extended_path.score_upper_bound > self.max_score {
+                        let extended_path_score = extended_path.score;
+                        self.paths.push(extended_path);
+                        self.max_score = u32::max(self.max_score, extended_path_score);
+                    }
                 }
+            } else {
+                return;
             }
-            // }
-            // else {
-            //     return;
-            // }
         }
     }
 }
