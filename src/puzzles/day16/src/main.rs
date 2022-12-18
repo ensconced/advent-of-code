@@ -1,5 +1,5 @@
 mod shortest_paths;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use shortest_paths::SortedShortestPaths;
 use utils::read_input;
@@ -222,9 +222,17 @@ impl<'a> PartialEq for ValvePath<'a> {
     }
 }
 
+impl<'a> Eq for ValvePath<'a> {}
+
 impl<'a> PartialOrd for ValvePath<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.score_upper_bound.partial_cmp(&other.score_upper_bound)
+    }
+}
+
+impl<'a> Ord for ValvePath<'a> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.score_upper_bound.cmp(&other.score_upper_bound)
     }
 }
 
@@ -240,7 +248,7 @@ fn parse_valve(line: &str) -> (&str, Valve) {
 }
 
 struct PathCollection<'a> {
-    paths: Vec<ValvePath<'a>>,
+    paths: BinaryHeap<ValvePath<'a>>,
     max_score: u32,
 }
 
@@ -252,8 +260,10 @@ impl<'a> PathCollection<'a> {
     ) -> Self {
         let path = ValvePath::initialise(start_valve, shortest_paths, valve_lookup);
         let score = path.score;
+        let mut heap = BinaryHeap::new();
+        heap.push(path);
         Self {
-            paths: vec![path],
+            paths: heap,
             max_score: score,
         }
     }
