@@ -1,7 +1,7 @@
 mod shortest_paths;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
-use shortest_paths::SortedShortestPaths;
+use shortest_paths::ShortestPaths;
 use utils::read_input;
 
 use crate::shortest_paths::floyd_warshall_shortest_paths;
@@ -38,7 +38,7 @@ struct ValvePath<'a> {
 impl<'a> ValvePath<'a> {
     fn initialise(
         start_valve: &'a Valve,
-        shortest_paths: &SortedShortestPaths,
+        shortest_paths: &ShortestPaths,
         valve_lookup: &'a HashMap<&'a str, Valve>,
     ) -> Self {
         let minute = 0;
@@ -82,7 +82,7 @@ impl<'a> ValvePath<'a> {
         &self,
         valve: &str,
         valve_lookup: &'a HashMap<&'a str, Valve>,
-        shortest_paths: &SortedShortestPaths,
+        shortest_paths: &ShortestPaths,
         minute: u32,
     ) -> ValvePath<'a> {
         let mut prev_steps = self.prev_steps.clone();
@@ -115,7 +115,7 @@ impl<'a> ValvePath<'a> {
         mut self,
         minute: u32,
         valve_lookup: &'a HashMap<&'a str, Valve>,
-        shortest_paths: &SortedShortestPaths,
+        shortest_paths: &ShortestPaths,
     ) -> ValvePath<'a> {
         let score = self.score + self.current_valve.flow_rate * (MINUTES - minute);
         self.open_valves.insert(self.current_valve.name);
@@ -152,7 +152,7 @@ impl<'a> ValvePath<'a> {
         self,
         minute: u32,
         valve_lookup: &'a HashMap<&str, Valve>,
-        shortest_paths: &SortedShortestPaths,
+        shortest_paths: &ShortestPaths,
     ) -> BinaryHeap<ValvePath<'a>> {
         let mut result = BinaryHeap::new();
 
@@ -178,7 +178,7 @@ impl<'a> ValvePath<'a> {
         current_valve_name: &str,
         open_valves: &HashSet<&str>,
         valve_lookup: &'a HashMap<&'a str, Valve>,
-        shortest_paths: &SortedShortestPaths,
+        shortest_paths: &ShortestPaths,
         current_score: u32,
         minute: u32,
     ) -> u32 {
@@ -238,7 +238,7 @@ impl<'a> PathCollection<'a> {
     fn new(
         start_valve: &'a Valve,
         valve_lookup: &'a HashMap<&'a str, Valve>,
-        shortest_paths: &SortedShortestPaths,
+        shortest_paths: &ShortestPaths,
     ) -> Self {
         let path = ValvePath::initialise(start_valve, shortest_paths, valve_lookup);
         let max_score = path.score;
@@ -249,7 +249,7 @@ impl<'a> PathCollection<'a> {
 
     fn extend(
         &mut self,
-        shortest_paths: &SortedShortestPaths,
+        shortest_paths: &ShortestPaths,
         valve_lookup: &'a HashMap<&'a str, Valve>,
         minute: u32,
     ) {
