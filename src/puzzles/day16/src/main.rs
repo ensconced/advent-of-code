@@ -55,7 +55,6 @@ impl<'a> PathCollection<'a> {
         minute: u32,
     ) {
         let mut old_paths = std::mem::take(&mut self.paths);
-
         while let Some(old_path) = old_paths.pop() {
             if old_path.score_upper_bound > self.best_score {
                 if old_path.done {
