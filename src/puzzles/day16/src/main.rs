@@ -31,6 +31,7 @@ struct ValvePath<'a> {
     open_valves: HashSet<&'a str>,
     done: bool,
     score: u32,
+    minute: u32,
 }
 
 impl<'a> ValvePath<'a> {
@@ -42,6 +43,7 @@ impl<'a> ValvePath<'a> {
             open_valves: HashSet::new(),
             done: false,
             score: 0,
+            minute: 0,
         }
     }
 
@@ -59,6 +61,7 @@ impl<'a> ValvePath<'a> {
         valve_lookup: &'a HashMap<&str, Valve>,
     ) -> Vec<ValvePath<'a>> {
         if self.done {
+            self.minute += 1;
             vec![self]
         } else {
             let mut extended_paths: Vec<_> = self
@@ -75,6 +78,7 @@ impl<'a> ValvePath<'a> {
                         open_valves: self.open_valves.clone(),
                         done: false,
                         score: self.score,
+                        minute: self.minute + 1,
                     }
                 })
                 .filter(|path| !path.ends_with_pointless_cycle())
@@ -88,6 +92,7 @@ impl<'a> ValvePath<'a> {
                     open_valves: self.open_valves,
                     done: true,
                     score: self.score,
+                    minute: self.minute + 1,
                 });
             } else {
                 let score = self.score + self.current_valve.flow_rate * (MINUTES - minute);
@@ -99,6 +104,7 @@ impl<'a> ValvePath<'a> {
                     open_valves: self.open_valves,
                     done: false,
                     score,
+                    minute: self.minute + 1,
                 });
             }
             extended_paths
