@@ -216,6 +216,18 @@ impl<'a> ValvePath<'a> {
     }
 }
 
+impl<'a> PartialEq for ValvePath<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.score_upper_bound == other.score_upper_bound
+    }
+}
+
+impl<'a> PartialOrd for ValvePath<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.score_upper_bound.partial_cmp(&other.score_upper_bound)
+    }
+}
+
 fn parse_valve(line: &str) -> (&str, Valve) {
     let parts: Vec<_> = line.split_ascii_whitespace().collect();
     let name = parts[1];
