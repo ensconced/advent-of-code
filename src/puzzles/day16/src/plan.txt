@@ -1,0 +1,3 @@
+- find bug in current version?
+- path contraction
+- all-pairs shortest paths...

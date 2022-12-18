@@ -177,7 +177,7 @@ impl<'a> ValvePath<'a> {
 
             if self.open_valves.contains(self.current_valve.name) {
                 result.push(self.do_nothing());
-            } else {
+            } else if self.current_valve.flow_rate > 0 {
                 result.push(self.open_valve(minute, valve_lookup, shortest_paths));
             }
         }
