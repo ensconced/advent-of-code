@@ -274,6 +274,7 @@ impl<'a> PathCollection<'a> {
         valve_lookup: &'a HashMap<&'a str, Valve>,
         minute: u32,
     ) {
+        self.max_score = 0;
         let mut old_paths = std::mem::take(&mut self.paths);
         while let Some(old_path) = old_paths.pop() {
             // if old_path.score_upper_bound > self.max_score {
