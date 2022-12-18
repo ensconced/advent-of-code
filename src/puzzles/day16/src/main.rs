@@ -1,5 +1,8 @@
 mod shortest_paths;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::{
+    collections::{BinaryHeap, HashMap, HashSet},
+    f32::MIN,
+};
 
 use shortest_paths::ShortestPaths;
 use utils::read_input;
@@ -61,7 +64,6 @@ impl<'a> ValvePath<'a> {
             open_valves,
             done: false,
             score: 0,
-            // minute: 0,
             score_upper_bound,
         }
     }
@@ -135,7 +137,6 @@ impl<'a> ValvePath<'a> {
             open_valves: self.open_valves,
             done: false,
             score,
-            // minute: self.minute + 1,
             score_upper_bound,
         }
     }
@@ -188,10 +189,14 @@ impl<'a> ValvePath<'a> {
             .iter()
             .filter(|(valve_name, _)| !open_valves.contains(*valve_name))
             .map(|(valve_name, path_length)| {
-                let min_minute_to_open_valve = minute + path_length + 1; //  + idx as u32;
-                let max_minutes_of_flow = MINUTES - min_minute_to_open_valve;
-                let flow_rate = valve_lookup.get(*valve_name).unwrap().flow_rate;
-                flow_rate * max_minutes_of_flow
+                let min_minute_to_open_valve = minute + path_length + 1;
+                if min_minute_to_open_valve >= MINUTES {
+                    0
+                } else {
+                    let max_minutes_of_flow = MINUTES - min_minute_to_open_valve;
+                    let flow_rate = valve_lookup.get(*valve_name).unwrap().flow_rate;
+                    flow_rate * max_minutes_of_flow
+                }
             })
             .sum::<u32>();
         remaining_score_to_accrue + current_score
@@ -231,7 +236,8 @@ fn parse_valve(line: &str) -> (&str, Valve) {
 
 struct PathCollection<'a> {
     paths: BinaryHeap<ValvePath<'a>>,
-    max_score: u32,
+    best_path: Option<ValvePath<'a>>,
+    best_score: u32,
 }
 
 impl<'a> PathCollection<'a> {
@@ -241,10 +247,13 @@ impl<'a> PathCollection<'a> {
         shortest_paths: &ShortestPaths,
     ) -> Self {
         let path = ValvePath::initialise(start_valve, shortest_paths, valve_lookup);
-        let max_score = path.score;
         let mut paths = BinaryHeap::new();
         paths.push(path);
-        Self { paths, max_score }
+        Self {
+            paths,
+            best_score: 0,
+            best_path: None,
+        }
     }
 
     fn extend(
@@ -255,7 +264,8 @@ impl<'a> PathCollection<'a> {
     ) {
         let mut old_paths = std::mem::take(&mut self.paths);
         while let Some(old_path) = old_paths.pop() {
-            if old_path.score_upper_bound > self.max_score {
+            let old_path_clone = old_path.clone();
+            if old_path.score_upper_bound > self.best_score {
                 if old_path.done {
                     self.paths.push(old_path);
                 } else {
@@ -263,10 +273,18 @@ impl<'a> PathCollection<'a> {
                         old_path.all_possible_extensions(minute, valve_lookup, shortest_paths);
 
                     while let Some(extended_path) = extended_paths.pop() {
-                        if extended_path.score_upper_bound > self.max_score {
+                        if extended_path.score > extended_path.score_upper_bound {
+                            dbg!(&old_path_clone);
+                            dbg!(&extended_path);
+                        }
+
+                        if extended_path.score_upper_bound > self.best_score {
                             let extended_path_score = extended_path.score;
+                            if extended_path_score > self.best_score {
+                                self.best_score = extended_path_score;
+                                self.best_path = Some(extended_path.clone());
+                            }
                             self.paths.push(extended_path);
-                            self.max_score = u32::max(self.max_score, extended_path_score);
                         } else {
                             break;
                         }
@@ -294,6 +312,6 @@ fn main() {
         paths.extend(&shortest_paths, &valve_lookup, minute);
     }
 
-    let part_1_answer = paths.max_score;
+    let part_1_answer = paths.best_score;
     println!("part 1: {part_1_answer}");
 }
