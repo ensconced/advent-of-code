@@ -17,6 +17,16 @@ impl<'a> ValveThread<'a> {
             current_valve: start_valve,
         }
     }
+
+    fn move_to_valve(&self, valve: &str, valve_lookup: &'a HashMap<&str, Valve>) -> Self {
+        let mut prev_steps = self.prev_steps.clone();
+        prev_steps.push(self.current_valve.name);
+        Self {
+            steps_since_opening_valve: self.steps_since_opening_valve + 1,
+            prev_steps,
+            current_valve: valve_lookup.get(valve).unwrap(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -29,7 +39,7 @@ pub struct ValvePath<'a> {
 }
 
 impl<'a> ValvePath<'a> {
-    pub fn initialise(
+    pub fn new(
         start_valve: &'a Valve,
         shortest_paths: &ShortestPaths,
         valve_lookup: &'a HashMap<&'a str, Valve>,
@@ -55,14 +65,10 @@ impl<'a> ValvePath<'a> {
             score_upper_bound,
         }
     }
-    fn do_nothing(self) -> ValvePath<'a> {
-        ValvePath {
-            thread: self.thread,
-            open_valves: self.open_valves,
-            done: true,
-            score: self.score,
-            score_upper_bound: self.score_upper_bound,
-        }
+
+    fn do_nothing(mut self) -> ValvePath<'a> {
+        self.done = true;
+        self
     }
 
     fn move_to_valve(
@@ -72,14 +78,12 @@ impl<'a> ValvePath<'a> {
         shortest_paths: &ShortestPaths,
         minute: u32,
     ) -> ValvePath<'a> {
-        let mut prev_steps = self.thread.prev_steps.clone();
-        prev_steps.push(self.thread.current_valve.name);
-
-        let current_valve = valve_lookup.get(valve).unwrap();
         let open_valves = self.open_valves.clone();
 
+        let thread = self.thread.move_to_valve(valve, valve_lookup);
+
         let score_upper_bound = ValvePath::final_score_upper_bound(
-            current_valve.name,
+            thread.current_valve.name,
             &open_valves,
             valve_lookup,
             shortest_paths,
@@ -88,11 +92,7 @@ impl<'a> ValvePath<'a> {
         );
 
         ValvePath {
-            thread: ValveThread {
-                steps_since_opening_valve: self.thread.steps_since_opening_valve + 1,
-                prev_steps,
-                current_valve,
-            },
+            thread,
             open_valves,
             done: false,
             score: self.score,
