@@ -31,7 +31,7 @@ struct ValvePath<'a> {
     open_valves: HashSet<&'a str>,
     done: bool,
     score: u32,
-    minute: u32,
+    // minute: u32,
     score_upper_bound: u32,
 }
 
@@ -61,14 +61,12 @@ impl<'a> ValvePath<'a> {
             open_valves,
             done: false,
             score: 0,
-            minute: 0,
+            // minute: 0,
             score_upper_bound,
         }
     }
 
     fn do_nothing(self) -> ValvePath<'a> {
-        let minute = self.minute + 1;
-        let score_upper_bound = self.score;
         ValvePath {
             steps_since_opening_valve: self.steps_since_opening_valve,
             prev_steps: self.prev_steps,
@@ -76,8 +74,7 @@ impl<'a> ValvePath<'a> {
             open_valves: self.open_valves,
             done: true,
             score: self.score,
-            minute,
-            score_upper_bound,
+            score_upper_bound: self.score_upper_bound,
         }
     }
 
@@ -86,21 +83,20 @@ impl<'a> ValvePath<'a> {
         valve: &str,
         valve_lookup: &'a HashMap<&'a str, Valve>,
         shortest_paths: &SortedShortestPaths,
+        minute: u32,
     ) -> ValvePath<'a> {
         let mut prev_steps = self.prev_steps.clone();
         prev_steps.push(self.current_valve.name);
 
         let current_valve = valve_lookup.get(valve).unwrap();
         let open_valves = self.open_valves.clone();
-        let current_score = self.score;
-        let minute = self.minute + 1;
 
         let score_upper_bound = ValvePath::final_score_upper_bound(
             current_valve.name,
             &open_valves,
             valve_lookup,
             shortest_paths,
-            current_score,
+            self.score,
             minute,
         );
 
@@ -110,8 +106,7 @@ impl<'a> ValvePath<'a> {
             current_valve,
             open_valves,
             done: false,
-            score: current_score,
-            minute,
+            score: self.score,
             score_upper_bound,
         }
     }
@@ -140,7 +135,7 @@ impl<'a> ValvePath<'a> {
             open_valves: self.open_valves,
             done: false,
             score,
-            minute: self.minute + 1,
+            // minute: self.minute + 1,
             score_upper_bound,
         }
     }
@@ -154,32 +149,27 @@ impl<'a> ValvePath<'a> {
     }
 
     fn all_possible_extensions(
-        mut self,
+        self,
         minute: u32,
         valve_lookup: &'a HashMap<&str, Valve>,
         shortest_paths: &SortedShortestPaths,
     ) -> BinaryHeap<ValvePath<'a>> {
         let mut result = BinaryHeap::new();
 
-        if self.done {
-            self.minute += 1;
-            result.push(self);
-        } else {
-            for path in self
-                .current_valve
-                .neighbours
-                .iter()
-                .map(|neighbour| self.move_to_valve(neighbour, valve_lookup, shortest_paths))
-                .filter(|path| !path.ends_with_pointless_cycle())
-            {
-                result.push(path);
-            }
+        for path in self
+            .current_valve
+            .neighbours
+            .iter()
+            .map(|neighbour| self.move_to_valve(neighbour, valve_lookup, shortest_paths, minute))
+            .filter(|path| !path.ends_with_pointless_cycle())
+        {
+            result.push(path);
+        }
 
-            if self.open_valves.contains(self.current_valve.name) {
-                result.push(self.do_nothing());
-            } else if self.current_valve.flow_rate > 0 {
-                result.push(self.open_valve(minute, valve_lookup, shortest_paths));
-            }
+        if self.open_valves.contains(self.current_valve.name) {
+            result.push(self.do_nothing());
+        } else if self.current_valve.flow_rate > 0 {
+            result.push(self.open_valve(minute, valve_lookup, shortest_paths));
         }
         result
     }
@@ -197,8 +187,7 @@ impl<'a> ValvePath<'a> {
             .unwrap()
             .iter()
             .filter(|(valve_name, _)| !open_valves.contains(*valve_name))
-            .enumerate()
-            .map(|(idx, (valve_name, path_length))| {
+            .map(|(valve_name, path_length)| {
                 let min_minute_to_open_valve = minute + path_length + 1; //  + idx as u32;
                 let max_minutes_of_flow = MINUTES - min_minute_to_open_valve;
                 let flow_rate = valve_lookup.get(*valve_name).unwrap().flow_rate;
@@ -252,13 +241,10 @@ impl<'a> PathCollection<'a> {
         shortest_paths: &SortedShortestPaths,
     ) -> Self {
         let path = ValvePath::initialise(start_valve, shortest_paths, valve_lookup);
-        let score = path.score;
-        let mut heap = BinaryHeap::new();
-        heap.push(path);
-        Self {
-            paths: heap,
-            max_score: score,
-        }
+        let max_score = path.score;
+        let mut paths = BinaryHeap::new();
+        paths.push(path);
+        Self { paths, max_score }
     }
 
     fn extend(
@@ -267,29 +253,27 @@ impl<'a> PathCollection<'a> {
         valve_lookup: &'a HashMap<&'a str, Valve>,
         minute: u32,
     ) {
-        self.max_score = 0;
         let mut old_paths = std::mem::take(&mut self.paths);
         while let Some(old_path) = old_paths.pop() {
-            let old_upper_bound = old_path.score_upper_bound;
             if old_path.score_upper_bound > self.max_score {
-                let extended_paths =
-                    old_path.all_possible_extensions(minute, valve_lookup, shortest_paths);
+                if old_path.done {
+                    self.paths.push(old_path);
+                } else {
+                    let mut extended_paths =
+                        old_path.all_possible_extensions(minute, valve_lookup, shortest_paths);
 
-                assert!(extended_paths
-                    .iter()
-                    .all(|ext| ext.score_upper_bound <= old_upper_bound));
-
-                for extended_path in extended_paths {
-                    if extended_path.score_upper_bound > self.max_score {
-                        let extended_path_score = extended_path.score;
-                        self.paths.push(extended_path);
-                        self.max_score = u32::max(self.max_score, extended_path_score);
-                    } else {
-                        break;
+                    while let Some(extended_path) = extended_paths.pop() {
+                        if extended_path.score_upper_bound > self.max_score {
+                            let extended_path_score = extended_path.score;
+                            self.paths.push(extended_path);
+                            self.max_score = u32::max(self.max_score, extended_path_score);
+                        } else {
+                            break;
+                        }
                     }
                 }
             } else {
-                return;
+                break;
             }
         }
     }
