@@ -35,6 +35,32 @@ impl<'a> ValveThread<'a> {
             current_valve: self.current_valve,
         }
     }
+
+    fn reachable_valve_values(
+        &self,
+        shortest_paths: &'a ShortestPaths,
+        open_valves: &HashSet<&str>,
+        minute: u32,
+        valve_lookup: &'a HashMap<&str, Valve>,
+    ) -> HashMap<&'a str, u32> {
+        shortest_paths
+            .all_shortest_paths_from(self.current_valve.name)
+            .unwrap()
+            .iter()
+            .filter(|(valve_name, _)| !open_valves.contains(*valve_name))
+            .map(|(&valve_name, path_length)| {
+                let min_minute_to_open_valve = minute + path_length + 1;
+                let value = if min_minute_to_open_valve >= MINUTES {
+                    0
+                } else {
+                    let max_minutes_of_flow = MINUTES - min_minute_to_open_valve;
+                    let flow_rate = valve_lookup.get(valve_name).unwrap().flow_rate;
+                    flow_rate * max_minutes_of_flow
+                };
+                (valve_name, value)
+            })
+            .collect()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -56,22 +82,24 @@ impl<'a> ValvePath<'a> {
         let current_score = 0;
         let open_valves = HashSet::new();
 
-        let score_upper_bound = ValvePath::final_score_upper_bound(
+        let mut result = Self {
+            thread: ValveThread::new(start_valve),
+            open_valves,
+            done: false,
+            score: 0,
+            score_upper_bound: 0,
+        };
+
+        result.score_upper_bound = result.final_score_upper_bound(
             start_valve.name,
-            &open_valves,
+            &result.open_valves,
             valve_lookup,
             shortest_paths,
             current_score,
             minute,
         );
 
-        Self {
-            thread: ValveThread::new(start_valve),
-            open_valves,
-            done: false,
-            score: 0,
-            score_upper_bound,
-        }
+        result
     }
 
     fn do_nothing(mut self) -> ValvePath<'a> {
@@ -90,7 +118,7 @@ impl<'a> ValvePath<'a> {
 
         let thread = self.thread.move_to_valve(valve, valve_lookup);
 
-        let score_upper_bound = ValvePath::final_score_upper_bound(
+        let score_upper_bound = self.final_score_upper_bound(
             thread.current_valve.name,
             &open_valves,
             valve_lookup,
@@ -117,7 +145,7 @@ impl<'a> ValvePath<'a> {
         let score = self.score + self.thread.current_valve.flow_rate * (MINUTES - minute);
         self.open_valves.insert(self.thread.current_valve.name);
 
-        let score_upper_bound = ValvePath::final_score_upper_bound(
+        let score_upper_bound = self.final_score_upper_bound(
             self.thread.current_valve.name,
             &self.open_valves,
             valve_lookup,
@@ -171,6 +199,7 @@ impl<'a> ValvePath<'a> {
     }
 
     fn final_score_upper_bound(
+        &self,
         current_valve_name: &str,
         open_valves: &HashSet<&str>,
         valve_lookup: &'a HashMap<&'a str, Valve>,
@@ -178,25 +207,10 @@ impl<'a> ValvePath<'a> {
         current_score: u32,
         minute: u32,
     ) -> u32 {
-        let remaining_score_to_accrue: HashMap<_, _> = shortest_paths
-            .all_shortest_paths_from(current_valve_name)
-            .unwrap()
-            .iter()
-            .filter(|(valve_name, _)| !open_valves.contains(*valve_name))
-            .map(|(valve_name, path_length)| {
-                let min_minute_to_open_valve = minute + path_length + 1;
-                let value = if min_minute_to_open_valve >= MINUTES {
-                    0
-                } else {
-                    let max_minutes_of_flow = MINUTES - min_minute_to_open_valve;
-                    let flow_rate = valve_lookup.get(*valve_name).unwrap().flow_rate;
-                    flow_rate * max_minutes_of_flow
-                };
-                (valve_name, value)
-            })
-            .collect();
-
-        current_score + remaining_score_to_accrue.values().sum::<u32>()
+        let reachable_valve_values =
+            self.thread
+                .reachable_valve_values(shortest_paths, open_valves, minute, valve_lookup);
+        current_score + reachable_valve_values.values().sum::<u32>()
     }
 }
 
