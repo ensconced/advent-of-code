@@ -27,7 +27,7 @@ impl<'a> ShortestPaths<'a> {
                         valve
                             .neighbours
                             .iter()
-                            .map(|neighbour_name| (neighbour_name, 1))
+                            .flat_map(|neighbour_name| [(neighbour_name, 1), (valve_name, 0)])
                             .collect(),
                     )
                 })

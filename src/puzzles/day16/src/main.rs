@@ -6,7 +6,9 @@ use utils::read_input;
 
 use crate::shortest_paths::floyd_warshall_shortest_paths;
 
-#[derive(Debug, PartialEq)]
+// TODO - could tighten upper bound calculcation - assume all in a line...
+
+#[derive(Debug)]
 pub struct Valve<'a> {
     name: &'a str,
     flow_rate: u32,
@@ -23,7 +25,7 @@ impl<'a> Valve<'a> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 struct ValvePath<'a> {
     steps_since_opening_valve: usize,
     prev_steps: Vec<&'a str>,
@@ -110,9 +112,8 @@ impl<'a> ValvePath<'a> {
         valve_lookup: &'a HashMap<&'a str, Valve>,
         shortest_paths: &ShortestPaths,
         minute: u32,
-        debug: bool,
     ) -> u32 {
-        let upper_bound_score_for_reachable_valves = shortest_paths
+        let upper_bound = shortest_paths
             .all_shortest_paths_from(self.current_valve.name)
             .unwrap()
             .iter()
@@ -124,7 +125,7 @@ impl<'a> ValvePath<'a> {
                 flow_rate * max_minutes_of_flow
             })
             .sum::<u32>();
-        upper_bound_score_for_reachable_valves + self.score
+        upper_bound + self.score
     }
 }
 
@@ -138,8 +139,6 @@ fn parse_valve(line: &str) -> (&str, Valve) {
     let neighbours = parts[9..].iter().map(|neighb| neighb.trim_end_matches(','));
     (name, Valve::new(name, flow_rate, neighbours))
 }
-
-const MINUTES: u32 = 30;
 
 struct PathCollection<'a> {
     paths: Vec<ValvePath<'a>>,
@@ -164,23 +163,10 @@ impl<'a> PathCollection<'a> {
     ) {
         let old_paths = std::mem::take(&mut self.paths);
         for old_path in old_paths.into_iter() {
-            let clone = old_path.clone();
-            let old_path_upper_bound =
-                clone.final_score_upper_bound(valve_lookup, shortest_paths, minute, false);
-            let extended_paths = clone.all_possible_extensions(minute, valve_lookup);
+            let extended_paths = old_path.all_possible_extensions(minute, valve_lookup);
             for extended_path in extended_paths {
-                let score_upper_bound = extended_path.final_score_upper_bound(
-                    valve_lookup,
-                    shortest_paths,
-                    minute,
-                    false,
-                );
-
-                if score_upper_bound <= old_path_upper_bound {
-                    dbg!(&old_path);
-                    dbg!(&extended_path);
-                    panic!("well that's strange...");
-                }
+                let score_upper_bound =
+                    extended_path.final_score_upper_bound(valve_lookup, shortest_paths, minute);
 
                 if score_upper_bound > self.max_score {
                     let extended_path_score = extended_path.score;
@@ -190,468 +176,11 @@ impl<'a> PathCollection<'a> {
             }
         }
     }
-
-    fn contains(&self, valve_path: &ValvePath) -> bool {
-        self.paths.iter().any(|path| path == valve_path)
-    }
 }
 
+const MINUTES: u32 = 30;
+
 fn main() {
-    let expected_current_valves = vec![
-        Valve {
-            name: "AA",
-            flow_rate: 0,
-            neighbours: HashSet::from(["DD", "II", "BB"]),
-        },
-        Valve {
-            name: "DD",
-            flow_rate: 20,
-            neighbours: HashSet::from(["CC", "AA", "EE"]),
-        },
-        Valve {
-            name: "DD",
-            flow_rate: 20,
-            neighbours: HashSet::from(["CC", "AA", "EE"]),
-        },
-        Valve {
-            name: "CC",
-            flow_rate: 2,
-            neighbours: HashSet::from(["DD", "BB"]),
-        },
-        Valve {
-            name: "BB",
-            flow_rate: 13,
-            neighbours: HashSet::from(["CC", "AA"]),
-        },
-        Valve {
-            name: "BB",
-            flow_rate: 13,
-            neighbours: HashSet::from(["CC", "AA"]),
-        },
-        Valve {
-            name: "AA",
-            flow_rate: 0,
-            neighbours: HashSet::from(["DD", "II", "BB"]),
-        },
-        Valve {
-            name: "II",
-            flow_rate: 0,
-            neighbours: HashSet::from(["AA", "JJ"]),
-        },
-        Valve {
-            name: "JJ",
-            flow_rate: 21,
-            neighbours: HashSet::from(["II"]),
-        },
-        Valve {
-            name: "JJ",
-            flow_rate: 21,
-            neighbours: HashSet::from(["II"]),
-        },
-        Valve {
-            name: "II",
-            flow_rate: 0,
-            neighbours: HashSet::from(["AA", "JJ"]),
-        },
-        Valve {
-            name: "AA",
-            flow_rate: 0,
-            neighbours: HashSet::from(["DD", "II", "BB"]),
-        },
-        Valve {
-            name: "DD",
-            flow_rate: 20,
-            neighbours: HashSet::from(["CC", "AA", "EE"]),
-        },
-        Valve {
-            name: "EE",
-            flow_rate: 3,
-            neighbours: HashSet::from(["FF", "DD"]),
-        },
-        Valve {
-            name: "FF",
-            flow_rate: 0,
-            neighbours: HashSet::from(["EE", "GG"]),
-        },
-        Valve {
-            name: "GG",
-            flow_rate: 0,
-            neighbours: HashSet::from(["FF", "HH"]),
-        },
-        Valve {
-            name: "HH",
-            flow_rate: 22,
-            neighbours: HashSet::from(["GG"]),
-        },
-        Valve {
-            name: "HH",
-            flow_rate: 22,
-            neighbours: HashSet::from(["GG"]),
-        },
-        Valve {
-            name: "GG",
-            flow_rate: 0,
-            neighbours: HashSet::from(["FF", "HH"]),
-        },
-        Valve {
-            name: "FF",
-            flow_rate: 0,
-            neighbours: HashSet::from(["EE", "GG"]),
-        },
-        Valve {
-            name: "EE",
-            flow_rate: 3,
-            neighbours: HashSet::from(["FF", "DD"]),
-        },
-        Valve {
-            name: "EE",
-            flow_rate: 3,
-            neighbours: HashSet::from(["FF", "DD"]),
-        },
-        Valve {
-            name: "DD",
-            flow_rate: 20,
-            neighbours: HashSet::from(["CC", "AA", "EE"]),
-        },
-        Valve {
-            name: "CC",
-            flow_rate: 2,
-            neighbours: HashSet::from(["DD", "BB"]),
-        },
-        Valve {
-            name: "CC",
-            flow_rate: 2,
-            neighbours: HashSet::from(["DD", "BB"]),
-        },
-        Valve {
-            name: "CC",
-            flow_rate: 2,
-            neighbours: HashSet::from(["DD", "BB"]),
-        },
-        Valve {
-            name: "CC",
-            flow_rate: 2,
-            neighbours: HashSet::from(["DD", "BB"]),
-        },
-        Valve {
-            name: "CC",
-            flow_rate: 2,
-            neighbours: HashSet::from(["DD", "BB"]),
-        },
-        Valve {
-            name: "CC",
-            flow_rate: 2,
-            neighbours: HashSet::from(["DD", "BB"]),
-        },
-        Valve {
-            name: "CC",
-            flow_rate: 2,
-            neighbours: HashSet::from(["DD", "BB"]),
-        },
-        Valve {
-            name: "CC",
-            flow_rate: 2,
-            neighbours: HashSet::from(["DD", "BB"]),
-        },
-    ];
-
-    let mut expected_paths = vec![
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![],
-            current_valve: &expected_current_valves[0],
-            open_valves: HashSet::new(),
-            done: false,
-            score: 0,
-        },
-        ValvePath {
-            steps_since_opening_valve: 1,
-            prev_steps: vec!["AA"],
-            current_valve: &expected_current_valves[1],
-            open_valves: HashSet::new(),
-            done: false,
-            score: 0,
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec!["AA"],
-            current_valve: &expected_current_valves[2],
-            open_valves: HashSet::from(["DD"]),
-            done: false,
-            score: 20 * 28,
-        },
-        ValvePath {
-            steps_since_opening_valve: 1,
-            prev_steps: vec!["AA", "DD"],
-            current_valve: &expected_current_valves[3],
-            open_valves: HashSet::from(["DD"]),
-            done: false,
-            score: 20 * 28,
-        },
-        ValvePath {
-            steps_since_opening_valve: 2,
-            prev_steps: vec!["AA", "DD", "CC"],
-            current_valve: &expected_current_valves[4],
-            open_valves: HashSet::from(["DD"]),
-            done: false,
-            score: 20 * 28,
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec!["AA", "DD", "CC"],
-            current_valve: &expected_current_valves[5],
-            open_valves: HashSet::from(["DD", "BB"]),
-            done: false,
-            score: 20 * 28 + 13 * 25,
-        },
-        ValvePath {
-            steps_since_opening_valve: 1,
-            prev_steps: vec!["AA", "DD", "CC", "BB"],
-            current_valve: &expected_current_valves[6],
-            open_valves: HashSet::from(["DD", "BB"]),
-            done: false,
-            score: 20 * 28 + 13 * 25,
-        },
-        ValvePath {
-            steps_since_opening_valve: 2,
-            prev_steps: vec!["AA", "DD", "CC", "BB", "AA"],
-            current_valve: &expected_current_valves[7],
-            open_valves: HashSet::from(["DD", "BB"]),
-            done: false,
-            score: 20 * 28 + 13 * 25,
-        },
-        ValvePath {
-            steps_since_opening_valve: 3,
-            prev_steps: vec!["AA", "DD", "CC", "BB", "AA", "II"],
-            current_valve: &expected_current_valves[8],
-            open_valves: HashSet::from(["DD", "BB"]),
-            done: false,
-            score: 20 * 28 + 13 * 25,
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec!["AA", "DD", "CC", "BB", "AA", "II"],
-            current_valve: &expected_current_valves[9],
-            open_valves: HashSet::from(["DD", "BB", "JJ"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21,
-        },
-        ValvePath {
-            steps_since_opening_valve: 1,
-            prev_steps: vec!["AA", "DD", "CC", "BB", "AA", "II", "JJ"],
-            current_valve: &expected_current_valves[10],
-            open_valves: HashSet::from(["DD", "BB", "JJ"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21,
-        },
-        ValvePath {
-            steps_since_opening_valve: 2,
-            prev_steps: vec!["AA", "DD", "CC", "BB", "AA", "II", "JJ", "II"],
-            current_valve: &expected_current_valves[11],
-            open_valves: HashSet::from(["DD", "BB", "JJ"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21,
-        },
-        ValvePath {
-            steps_since_opening_valve: 3,
-            prev_steps: vec!["AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA"],
-            current_valve: &expected_current_valves[12],
-            open_valves: HashSet::from(["DD", "BB", "JJ"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21,
-        },
-        ValvePath {
-            steps_since_opening_valve: 4,
-            prev_steps: vec!["AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD"],
-            current_valve: &expected_current_valves[13],
-            open_valves: HashSet::from(["DD", "BB", "JJ"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21,
-        },
-        ValvePath {
-            steps_since_opening_valve: 5,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE",
-            ],
-            current_valve: &expected_current_valves[14],
-            open_valves: HashSet::from(["DD", "BB", "JJ"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21,
-        },
-        ValvePath {
-            steps_since_opening_valve: 6,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF",
-            ],
-            current_valve: &expected_current_valves[15],
-            open_valves: HashSet::from(["DD", "BB", "JJ"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21,
-        },
-        ValvePath {
-            steps_since_opening_valve: 7,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG",
-            ],
-            current_valve: &expected_current_valves[16],
-            open_valves: HashSet::from(["DD", "BB", "JJ"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21,
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG",
-            ],
-            current_valve: &expected_current_valves[17],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17),
-        },
-        ValvePath {
-            steps_since_opening_valve: 1,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-            ],
-            current_valve: &expected_current_valves[18],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17),
-        },
-        ValvePath {
-            steps_since_opening_valve: 2,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG",
-            ],
-            current_valve: &expected_current_valves[19],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17),
-        },
-        ValvePath {
-            steps_since_opening_valve: 3,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF",
-            ],
-            current_valve: &expected_current_valves[20],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17),
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF",
-            ],
-            current_valve: &expected_current_valves[21],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH", "EE"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17) + 3 * (30 - 21),
-        },
-        ValvePath {
-            steps_since_opening_valve: 1,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF", "EE",
-            ],
-            current_valve: &expected_current_valves[22],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH", "EE"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17) + 3 * (30 - 21),
-        },
-        ValvePath {
-            steps_since_opening_valve: 2,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF", "EE", "DD",
-            ],
-            current_valve: &expected_current_valves[23],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH", "EE"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17) + 3 * (30 - 21),
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF", "EE", "DD",
-            ],
-            current_valve: &expected_current_valves[24],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH", "EE", "CC"]),
-            done: false,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17) + 3 * (30 - 21) + 2 * (30 - 24),
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF", "EE", "DD",
-            ],
-            current_valve: &expected_current_valves[25],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH", "EE", "CC"]),
-            done: true,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17) + 3 * (30 - 21) + 2 * (30 - 24),
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF", "EE", "DD",
-            ],
-            current_valve: &expected_current_valves[26],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH", "EE", "CC"]),
-            done: true,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17) + 3 * (30 - 21) + 2 * (30 - 24),
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF", "EE", "DD",
-            ],
-            current_valve: &expected_current_valves[27],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH", "EE", "CC"]),
-            done: true,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17) + 3 * (30 - 21) + 2 * (30 - 24),
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF", "EE", "DD",
-            ],
-            current_valve: &expected_current_valves[28],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH", "EE", "CC"]),
-            done: true,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17) + 3 * (30 - 21) + 2 * (30 - 24),
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF", "EE", "DD",
-            ],
-            current_valve: &expected_current_valves[29],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH", "EE", "CC"]),
-            done: true,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17) + 3 * (30 - 21) + 2 * (30 - 24),
-        },
-        ValvePath {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![
-                "AA", "DD", "CC", "BB", "AA", "II", "JJ", "II", "AA", "DD", "EE", "FF", "GG", "HH",
-                "GG", "FF", "EE", "DD",
-            ],
-            current_valve: &expected_current_valves[30],
-            open_valves: HashSet::from(["DD", "BB", "JJ", "HH", "EE", "CC"]),
-            done: true,
-            score: 20 * 28 + 13 * 25 + 21 * 21 + 22 * (30 - 17) + 3 * (30 - 21) + 2 * (30 - 24),
-        },
-    ];
-
     let input = read_input();
     let valve_lookup: HashMap<_, _> = input.lines().map(parse_valve).collect();
     let shortest_paths = floyd_warshall_shortest_paths(&valve_lookup);
