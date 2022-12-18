@@ -1,11 +1,15 @@
+mod parser;
 mod shortest_paths;
 mod single_path;
+mod valve_thread;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use shortest_paths::ShortestPaths;
 use utils::read_input;
 
-use crate::{shortest_paths::floyd_warshall_shortest_paths, single_path::ValvePath};
+use crate::{
+    parser::parse_valve, shortest_paths::floyd_warshall_shortest_paths, single_path::ValvePath,
+};
 
 #[derive(Debug)]
 pub struct Valve<'a> {
@@ -51,6 +55,7 @@ impl<'a> PathCollection<'a> {
         minute: u32,
     ) {
         let mut old_paths = std::mem::take(&mut self.paths);
+
         while let Some(old_path) = old_paths.pop() {
             if old_path.score_upper_bound > self.best_score {
                 if old_path.done {
@@ -79,17 +84,6 @@ impl<'a> PathCollection<'a> {
 }
 
 pub const MINUTES: u32 = 30;
-
-fn parse_valve(line: &str) -> (&str, Valve) {
-    let parts: Vec<_> = line.split_ascii_whitespace().collect();
-    let name = parts[1];
-    let flow_rate = parts[4]
-        .strip_prefix("rate=")
-        .and_then(|rhs| rhs.strip_suffix(';'))
-        .unwrap();
-    let neighbours = parts[9..].iter().map(|neighb| neighb.trim_end_matches(','));
-    (name, Valve::new(name, flow_rate, neighbours))
-}
 
 fn part_one(valve_lookup: &HashMap<&str, Valve>, shortest_paths: &ShortestPaths) -> u32 {
     let start_valve = valve_lookup.get("AA").unwrap();
