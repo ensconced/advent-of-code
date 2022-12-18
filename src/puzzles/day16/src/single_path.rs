@@ -1,6 +1,6 @@
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
-use crate::{shortest_paths::ShortestPaths, valve_path::ValvePath, Valve, MINUTES};
+use crate::{shortest_paths::ShortestPaths, Valve, MINUTES};
 
 #[derive(Clone, Debug)]
 pub struct SinglePath<'a> {
@@ -8,12 +8,40 @@ pub struct SinglePath<'a> {
     prev_steps: Vec<&'a str>,
     current_valve: &'a Valve<'a>,
     open_valves: HashSet<&'a str>,
-    done: bool,
-    score: u32,
-    score_upper_bound: u32,
+    pub done: bool,
+    pub score: u32,
+    pub score_upper_bound: u32,
 }
 
 impl<'a> SinglePath<'a> {
+    pub fn initialise(
+        start_valve: &'a Valve,
+        shortest_paths: &ShortestPaths,
+        valve_lookup: &'a HashMap<&'a str, Valve>,
+    ) -> Self {
+        let minute = 0;
+        let current_score = 0;
+        let open_valves = HashSet::new();
+
+        let score_upper_bound = SinglePath::final_score_upper_bound(
+            start_valve.name,
+            &open_valves,
+            valve_lookup,
+            shortest_paths,
+            current_score,
+            minute,
+        );
+
+        Self {
+            steps_since_opening_valve: 0,
+            prev_steps: vec![],
+            current_valve: start_valve,
+            open_valves,
+            done: false,
+            score: 0,
+            score_upper_bound,
+        }
+    }
     fn do_nothing(self) -> SinglePath<'a> {
         SinglePath {
             steps_since_opening_valve: self.steps_since_opening_valve,
@@ -94,39 +122,8 @@ impl<'a> SinglePath<'a> {
             .take(self.steps_since_opening_valve)
             .any(|el| el == &self.current_valve.name)
     }
-}
 
-impl<'a> ValvePath<'a> for SinglePath<'a> {
-    fn initialise(
-        start_valve: &'a Valve,
-        shortest_paths: &ShortestPaths,
-        valve_lookup: &'a HashMap<&'a str, Valve>,
-    ) -> Self {
-        let minute = 0;
-        let current_score = 0;
-        let open_valves = HashSet::new();
-
-        let score_upper_bound = SinglePath::final_score_upper_bound(
-            start_valve.name,
-            &open_valves,
-            valve_lookup,
-            shortest_paths,
-            current_score,
-            minute,
-        );
-
-        Self {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![],
-            current_valve: start_valve,
-            open_valves,
-            done: false,
-            score: 0,
-            score_upper_bound,
-        }
-    }
-
-    fn all_possible_extensions(
+    pub fn all_possible_extensions(
         self,
         minute: u32,
         valve_lookup: &'a HashMap<&str, Valve>,
@@ -177,18 +174,6 @@ impl<'a> ValvePath<'a> for SinglePath<'a> {
             })
             .sum::<u32>();
         remaining_score_to_accrue + current_score
-    }
-
-    fn score(&self) -> u32 {
-        self.score
-    }
-
-    fn done(&self) -> bool {
-        self.done
-    }
-
-    fn score_upper_bound(&self) -> u32 {
-        self.score_upper_bound
     }
 }
 

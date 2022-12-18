@@ -1,11 +1,9 @@
 mod shortest_paths;
 mod single_path;
-mod valve_path;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use shortest_paths::ShortestPaths;
 use utils::read_input;
-use valve_path::ValvePath;
 
 use crate::{shortest_paths::floyd_warshall_shortest_paths, single_path::SinglePath};
 
@@ -26,21 +24,18 @@ impl<'a> Valve<'a> {
     }
 }
 
-struct PathCollection<T> {
-    paths: BinaryHeap<T>,
+struct PathCollection<'a> {
+    paths: BinaryHeap<SinglePath<'a>>,
     best_score: u32,
 }
 
-impl<'a, T> PathCollection<T>
-where
-    T: ValvePath<'a> + Ord,
-{
+impl<'a> PathCollection<'a> {
     fn new(
         start_valve: &'a Valve,
         valve_lookup: &'a HashMap<&'a str, Valve>,
         shortest_paths: &ShortestPaths,
     ) -> Self {
-        let path = T::initialise(start_valve, shortest_paths, valve_lookup);
+        let path = SinglePath::initialise(start_valve, shortest_paths, valve_lookup);
         let mut paths = BinaryHeap::new();
         paths.push(path);
         Self {
@@ -57,16 +52,16 @@ where
     ) {
         let mut old_paths = std::mem::take(&mut self.paths);
         while let Some(old_path) = old_paths.pop() {
-            if old_path.score_upper_bound() > self.best_score {
-                if old_path.done() {
+            if old_path.score_upper_bound > self.best_score {
+                if old_path.done {
                     self.paths.push(old_path);
                 } else {
                     let mut extended_paths =
                         old_path.all_possible_extensions(minute, valve_lookup, shortest_paths);
 
                     while let Some(extended_path) = extended_paths.pop() {
-                        if extended_path.score_upper_bound() > self.best_score {
-                            let extended_path_score = extended_path.score();
+                        if extended_path.score_upper_bound > self.best_score {
+                            let extended_path_score = extended_path.score;
                             if extended_path_score > self.best_score {
                                 self.best_score = extended_path_score;
                             }
@@ -99,8 +94,7 @@ fn parse_valve(line: &str) -> (&str, Valve) {
 fn part_one(valve_lookup: &HashMap<&str, Valve>, shortest_paths: &ShortestPaths) -> u32 {
     let start_valve = valve_lookup.get("AA").unwrap();
 
-    let mut paths: PathCollection<SinglePath> =
-        PathCollection::new(start_valve, valve_lookup, shortest_paths);
+    let mut paths = PathCollection::new(start_valve, valve_lookup, shortest_paths);
 
     for minute in 1..=MINUTES {
         println!("minute: {minute}, path count: {}", paths.paths.len());
