@@ -5,7 +5,7 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 use shortest_paths::ShortestPaths;
 use utils::read_input;
 
-use crate::{shortest_paths::floyd_warshall_shortest_paths, single_path::SinglePath};
+use crate::{shortest_paths::floyd_warshall_shortest_paths, single_path::ValvePath};
 
 #[derive(Debug)]
 pub struct Valve<'a> {
@@ -25,7 +25,7 @@ impl<'a> Valve<'a> {
 }
 
 struct PathCollection<'a> {
-    paths: BinaryHeap<SinglePath<'a>>,
+    paths: BinaryHeap<ValvePath<'a>>,
     best_score: u32,
 }
 
@@ -35,7 +35,7 @@ impl<'a> PathCollection<'a> {
         valve_lookup: &'a HashMap<&'a str, Valve>,
         shortest_paths: &ShortestPaths,
     ) -> Self {
-        let path = SinglePath::initialise(start_valve, shortest_paths, valve_lookup);
+        let path = ValvePath::initialise(start_valve, shortest_paths, valve_lookup);
         let mut paths = BinaryHeap::new();
         paths.push(path);
         Self {

@@ -3,17 +3,32 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 use crate::{shortest_paths::ShortestPaths, Valve, MINUTES};
 
 #[derive(Clone, Debug)]
-pub struct SinglePath<'a> {
+struct ValveThread<'a> {
     steps_since_opening_valve: usize,
     prev_steps: Vec<&'a str>,
     current_valve: &'a Valve<'a>,
-    open_valves: HashSet<&'a str>,
+}
+
+impl<'a> ValveThread<'a> {
+    fn new(start_valve: &'a Valve) -> Self {
+        Self {
+            steps_since_opening_valve: 0,
+            prev_steps: vec![],
+            current_valve: start_valve,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ValvePath<'a> {
     pub done: bool,
     pub score: u32,
     pub score_upper_bound: u32,
+    open_valves: HashSet<&'a str>,
+    thread: ValveThread<'a>,
 }
 
-impl<'a> SinglePath<'a> {
+impl<'a> ValvePath<'a> {
     pub fn initialise(
         start_valve: &'a Valve,
         shortest_paths: &ShortestPaths,
@@ -23,7 +38,7 @@ impl<'a> SinglePath<'a> {
         let current_score = 0;
         let open_valves = HashSet::new();
 
-        let score_upper_bound = SinglePath::final_score_upper_bound(
+        let score_upper_bound = ValvePath::final_score_upper_bound(
             start_valve.name,
             &open_valves,
             valve_lookup,
@@ -33,20 +48,16 @@ impl<'a> SinglePath<'a> {
         );
 
         Self {
-            steps_since_opening_valve: 0,
-            prev_steps: vec![],
-            current_valve: start_valve,
+            thread: ValveThread::new(start_valve),
             open_valves,
             done: false,
             score: 0,
             score_upper_bound,
         }
     }
-    fn do_nothing(self) -> SinglePath<'a> {
-        SinglePath {
-            steps_since_opening_valve: self.steps_since_opening_valve,
-            prev_steps: self.prev_steps,
-            current_valve: self.current_valve,
+    fn do_nothing(self) -> ValvePath<'a> {
+        ValvePath {
+            thread: self.thread,
             open_valves: self.open_valves,
             done: true,
             score: self.score,
@@ -60,14 +71,14 @@ impl<'a> SinglePath<'a> {
         valve_lookup: &'a HashMap<&'a str, Valve>,
         shortest_paths: &ShortestPaths,
         minute: u32,
-    ) -> SinglePath<'a> {
-        let mut prev_steps = self.prev_steps.clone();
-        prev_steps.push(self.current_valve.name);
+    ) -> ValvePath<'a> {
+        let mut prev_steps = self.thread.prev_steps.clone();
+        prev_steps.push(self.thread.current_valve.name);
 
         let current_valve = valve_lookup.get(valve).unwrap();
         let open_valves = self.open_valves.clone();
 
-        let score_upper_bound = SinglePath::final_score_upper_bound(
+        let score_upper_bound = ValvePath::final_score_upper_bound(
             current_valve.name,
             &open_valves,
             valve_lookup,
@@ -76,10 +87,12 @@ impl<'a> SinglePath<'a> {
             minute,
         );
 
-        SinglePath {
-            steps_since_opening_valve: self.steps_since_opening_valve + 1,
-            prev_steps,
-            current_valve,
+        ValvePath {
+            thread: ValveThread {
+                steps_since_opening_valve: self.thread.steps_since_opening_valve + 1,
+                prev_steps,
+                current_valve,
+            },
             open_valves,
             done: false,
             score: self.score,
@@ -92,22 +105,24 @@ impl<'a> SinglePath<'a> {
         minute: u32,
         valve_lookup: &'a HashMap<&'a str, Valve>,
         shortest_paths: &ShortestPaths,
-    ) -> SinglePath<'a> {
-        let score = self.score + self.current_valve.flow_rate * (MINUTES - minute);
-        self.open_valves.insert(self.current_valve.name);
+    ) -> ValvePath<'a> {
+        let score = self.score + self.thread.current_valve.flow_rate * (MINUTES - minute);
+        self.open_valves.insert(self.thread.current_valve.name);
 
-        let score_upper_bound = SinglePath::final_score_upper_bound(
-            self.current_valve.name,
+        let score_upper_bound = ValvePath::final_score_upper_bound(
+            self.thread.current_valve.name,
             &self.open_valves,
             valve_lookup,
             shortest_paths,
             score,
             minute,
         );
-        SinglePath {
-            steps_since_opening_valve: 0,
-            prev_steps: self.prev_steps,
-            current_valve: self.current_valve,
+        ValvePath {
+            thread: ValveThread {
+                steps_since_opening_valve: 0,
+                prev_steps: self.thread.prev_steps,
+                current_valve: self.thread.current_valve,
+            },
             open_valves: self.open_valves,
             done: false,
             score,
@@ -116,11 +131,12 @@ impl<'a> SinglePath<'a> {
     }
 
     fn ends_with_pointless_cycle(&self) -> bool {
-        self.prev_steps
+        self.thread
+            .prev_steps
             .iter()
             .rev()
-            .take(self.steps_since_opening_valve)
-            .any(|el| el == &self.current_valve.name)
+            .take(self.thread.steps_since_opening_valve)
+            .any(|el| el == &self.thread.current_valve.name)
     }
 
     pub fn all_possible_extensions(
@@ -128,10 +144,11 @@ impl<'a> SinglePath<'a> {
         minute: u32,
         valve_lookup: &'a HashMap<&str, Valve>,
         shortest_paths: &ShortestPaths,
-    ) -> BinaryHeap<SinglePath<'a>> {
+    ) -> BinaryHeap<ValvePath<'a>> {
         let mut result = BinaryHeap::new();
 
         for path in self
+            .thread
             .current_valve
             .neighbours
             .iter()
@@ -141,9 +158,9 @@ impl<'a> SinglePath<'a> {
             result.push(path);
         }
 
-        if self.open_valves.contains(self.current_valve.name) {
+        if self.open_valves.contains(self.thread.current_valve.name) {
             result.push(self.do_nothing());
-        } else if self.current_valve.flow_rate > 0 {
+        } else if self.thread.current_valve.flow_rate > 0 {
             result.push(self.open_valve(minute, valve_lookup, shortest_paths));
         }
         result
@@ -177,21 +194,21 @@ impl<'a> SinglePath<'a> {
     }
 }
 
-impl<'a> PartialEq for SinglePath<'a> {
+impl<'a> PartialEq for ValvePath<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.score_upper_bound == other.score_upper_bound
     }
 }
 
-impl<'a> Eq for SinglePath<'a> {}
+impl<'a> Eq for ValvePath<'a> {}
 
-impl<'a> PartialOrd for SinglePath<'a> {
+impl<'a> PartialOrd for ValvePath<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.score_upper_bound.partial_cmp(&other.score_upper_bound)
     }
 }
 
-impl<'a> Ord for SinglePath<'a> {
+impl<'a> Ord for ValvePath<'a> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.score_upper_bound.cmp(&other.score_upper_bound)
     }
