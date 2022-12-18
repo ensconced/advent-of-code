@@ -178,23 +178,25 @@ impl<'a> ValvePath<'a> {
         current_score: u32,
         minute: u32,
     ) -> u32 {
-        let remaining_score_to_accrue = shortest_paths
+        let remaining_score_to_accrue: HashMap<_, _> = shortest_paths
             .all_shortest_paths_from(current_valve_name)
             .unwrap()
             .iter()
             .filter(|(valve_name, _)| !open_valves.contains(*valve_name))
             .map(|(valve_name, path_length)| {
                 let min_minute_to_open_valve = minute + path_length + 1;
-                if min_minute_to_open_valve >= MINUTES {
+                let value = if min_minute_to_open_valve >= MINUTES {
                     0
                 } else {
                     let max_minutes_of_flow = MINUTES - min_minute_to_open_valve;
                     let flow_rate = valve_lookup.get(*valve_name).unwrap().flow_rate;
                     flow_rate * max_minutes_of_flow
-                }
+                };
+                (valve_name, value)
             })
-            .sum::<u32>();
-        remaining_score_to_accrue + current_score
+            .collect();
+
+        current_score + remaining_score_to_accrue.values().sum::<u32>()
     }
 }
 
