@@ -66,20 +66,9 @@ impl<'a> ValvePath<'a> {
         }
     }
 
-    fn do_nothing(
-        self,
-        valve_lookup: &'a HashMap<&'a str, Valve>,
-        shortest_paths: &SortedShortestPaths,
-    ) -> ValvePath<'a> {
+    fn do_nothing(self) -> ValvePath<'a> {
         let minute = self.minute + 1;
-        let score_upper_bound = ValvePath::final_score_upper_bound(
-            self.current_valve.name,
-            &self.open_valves,
-            valve_lookup,
-            shortest_paths,
-            self.score,
-            minute,
-        );
+        let score_upper_bound = self.score;
         ValvePath {
             steps_since_opening_valve: self.steps_since_opening_valve,
             prev_steps: self.prev_steps,
@@ -187,7 +176,7 @@ impl<'a> ValvePath<'a> {
             }
 
             if self.open_valves.contains(self.current_valve.name) {
-                result.push(self.do_nothing(valve_lookup, shortest_paths));
+                result.push(self.do_nothing());
             } else {
                 result.push(self.open_valve(minute, valve_lookup, shortest_paths));
             }
