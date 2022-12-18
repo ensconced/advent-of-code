@@ -1,12 +1,10 @@
 mod shortest_paths;
 use std::collections::{HashMap, HashSet};
 
-use shortest_paths::ShortestPaths;
+use shortest_paths::SortedShortestPaths;
 use utils::read_input;
 
 use crate::shortest_paths::floyd_warshall_shortest_paths;
-
-// TODO - could tighten upper bound calculcation - assume all in a line...
 
 #[derive(Debug)]
 pub struct Valve<'a> {
@@ -110,20 +108,14 @@ impl<'a> ValvePath<'a> {
     fn final_score_upper_bound(
         &self,
         valve_lookup: &'a HashMap<&'a str, Valve>,
-        shortest_paths: &ShortestPaths,
+        shortest_paths: &SortedShortestPaths,
         minute: u32,
     ) -> u32 {
-        let mut reachable_closed_valves: Vec<_> = shortest_paths
+        let upper_bound = shortest_paths
             .all_shortest_paths_from(self.current_valve.name)
             .unwrap()
             .iter()
             .filter(|(valve_name, _)| !self.open_valves.contains(**valve_name))
-            .collect();
-
-        reachable_closed_valves.sort_by_key(|(_, distance)| *distance);
-
-        let upper_bound = reachable_closed_valves
-            .into_iter()
             .enumerate()
             .map(|(idx, (valve_name, path_length))| {
                 let min_minute_to_open_valve = minute + path_length + 1 + idx as u32;
@@ -164,7 +156,7 @@ impl<'a> PathCollection<'a> {
 
     fn extend(
         &mut self,
-        shortest_paths: &ShortestPaths,
+        shortest_paths: &SortedShortestPaths,
         valve_lookup: &'a HashMap<&'a str, Valve>,
         minute: u32,
     ) {

@@ -5,11 +5,15 @@ use crate::Valve;
 #[derive(Debug)]
 pub struct ShortestPaths<'a>(HashMap<&'a &'a str, HashMap<&'a &'a str, u32>>);
 
-impl<'a> ShortestPaths<'a> {
-    pub fn all_shortest_paths_from(&'a self, source: &'a str) -> Option<&'a HashMap<&&str, u32>> {
+pub struct SortedShortestPaths<'a>(HashMap<&'a &'a str, Vec<(&'a &'a str, u32)>>);
+
+impl<'a> SortedShortestPaths<'a> {
+    pub fn all_shortest_paths_from(&'a self, source: &'a str) -> Option<&'a Vec<(&&str, u32)>> {
         self.0.get(&source)
     }
+}
 
+impl<'a> ShortestPaths<'a> {
     fn shortest_path(&self, source: &str, target: &str) -> Option<u32> {
         self.0
             .get(&source)
@@ -74,10 +78,26 @@ impl<'a> ShortestPaths<'a> {
 
 pub fn floyd_warshall_shortest_paths<'a>(
     valve_lookup: &'a HashMap<&'a str, Valve>,
-) -> ShortestPaths<'a> {
-    valve_lookup
+) -> SortedShortestPaths<'a> {
+    let shortest_paths = valve_lookup
         .values()
         .fold(ShortestPaths::initialise(valve_lookup), |acc, valve| {
             acc.include_valve(valve, valve_lookup)
-        })
+        });
+
+    SortedShortestPaths(
+        shortest_paths
+            .0
+            .into_iter()
+            .map(|(source_valve_name, hashmap)| {
+                let mut v: Vec<_> = hashmap
+                    .into_iter()
+                    .map(|(target_valve_name, dist)| (target_valve_name, dist))
+                    .collect();
+
+                v.sort_by_key(|(_, b)| *b);
+                (source_valve_name, v)
+            })
+            .collect(),
+    )
 }
