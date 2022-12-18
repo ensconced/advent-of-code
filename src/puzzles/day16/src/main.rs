@@ -169,26 +169,30 @@ impl<'a> ValvePath<'a> {
         minute: u32,
         valve_lookup: &'a HashMap<&str, Valve>,
         shortest_paths: &SortedShortestPaths,
-    ) -> Vec<ValvePath<'a>> {
+    ) -> BinaryHeap<ValvePath<'a>> {
+        let mut result = BinaryHeap::new();
+
         if self.done {
             self.minute += 1;
-            vec![self]
+            result.push(self);
         } else {
-            let mut extended_paths: Vec<_> = self
+            for path in self
                 .current_valve
                 .neighbours
                 .iter()
                 .map(|neighbour| self.move_to_valve(neighbour, valve_lookup, shortest_paths))
                 .filter(|path| !path.ends_with_pointless_cycle())
-                .collect();
+            {
+                result.push(path);
+            }
 
             if self.open_valves.contains(self.current_valve.name) {
-                extended_paths.push(self.do_nothing(valve_lookup, shortest_paths));
+                result.push(self.do_nothing(valve_lookup, shortest_paths));
             } else {
-                extended_paths.push(self.open_valve(minute, valve_lookup, shortest_paths));
+                result.push(self.open_valve(minute, valve_lookup, shortest_paths));
             }
-            extended_paths
         }
+        result
     }
 
     fn final_score_upper_bound(
@@ -291,6 +295,8 @@ impl<'a> PathCollection<'a> {
                         let extended_path_score = extended_path.score;
                         self.paths.push(extended_path);
                         self.max_score = u32::max(self.max_score, extended_path_score);
+                    } else {
+                        break;
                     }
                 }
             } else {
