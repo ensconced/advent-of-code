@@ -274,8 +274,8 @@ impl<'a> PathCollection<'a> {
         valve_lookup: &'a HashMap<&'a str, Valve>,
         minute: u32,
     ) {
-        let old_paths = std::mem::take(&mut self.paths);
-        for old_path in old_paths.into_iter() {
+        let mut old_paths = std::mem::take(&mut self.paths);
+        while let Some(old_path) = old_paths.pop() {
             // if old_path.score_upper_bound > self.max_score {
             let extended_paths =
                 old_path.all_possible_extensions(minute, valve_lookup, shortest_paths);
@@ -291,6 +291,10 @@ impl<'a> PathCollection<'a> {
             //     return;
             // }
         }
+
+        // for old_path in old_paths.into_iter() {
+
+        // }
     }
 }
 
