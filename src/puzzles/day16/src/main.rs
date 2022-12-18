@@ -1,8 +1,5 @@
 mod shortest_paths;
-use std::{
-    collections::{BinaryHeap, HashMap, HashSet},
-    f32::MIN,
-};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use shortest_paths::ShortestPaths;
 use utils::read_input;
@@ -34,7 +31,6 @@ struct ValvePath<'a> {
     open_valves: HashSet<&'a str>,
     done: bool,
     score: u32,
-    // minute: u32,
     score_upper_bound: u32,
 }
 
@@ -236,7 +232,6 @@ fn parse_valve(line: &str) -> (&str, Valve) {
 
 struct PathCollection<'a> {
     paths: BinaryHeap<ValvePath<'a>>,
-    best_path: Option<ValvePath<'a>>,
     best_score: u32,
 }
 
@@ -252,7 +247,6 @@ impl<'a> PathCollection<'a> {
         Self {
             paths,
             best_score: 0,
-            best_path: None,
         }
     }
 
@@ -282,7 +276,6 @@ impl<'a> PathCollection<'a> {
                             let extended_path_score = extended_path.score;
                             if extended_path_score > self.best_score {
                                 self.best_score = extended_path_score;
-                                self.best_path = Some(extended_path.clone());
                             }
                             self.paths.push(extended_path);
                         } else {
