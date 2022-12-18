@@ -36,7 +36,7 @@ impl<'a> ValveThread<'a> {
         }
     }
 
-    fn reachable_valve_values(
+    fn upper_bound_of_remaining_reachable_value(
         &self,
         shortest_paths: &'a ShortestPaths,
         open_valves: &HashSet<&str>,
@@ -91,7 +91,6 @@ impl<'a> ValvePath<'a> {
         };
 
         result.score_upper_bound = result.final_score_upper_bound(
-            start_valve.name,
             &result.open_valves,
             valve_lookup,
             shortest_paths,
@@ -119,7 +118,6 @@ impl<'a> ValvePath<'a> {
         let thread = self.thread.move_to_valve(valve, valve_lookup);
 
         let score_upper_bound = self.final_score_upper_bound(
-            thread.current_valve.name,
             &open_valves,
             valve_lookup,
             shortest_paths,
@@ -146,7 +144,6 @@ impl<'a> ValvePath<'a> {
         self.open_valves.insert(self.thread.current_valve.name);
 
         let score_upper_bound = self.final_score_upper_bound(
-            self.thread.current_valve.name,
             &self.open_valves,
             valve_lookup,
             shortest_paths,
@@ -200,16 +197,18 @@ impl<'a> ValvePath<'a> {
 
     fn final_score_upper_bound(
         &self,
-        current_valve_name: &str,
         open_valves: &HashSet<&str>,
         valve_lookup: &'a HashMap<&'a str, Valve>,
         shortest_paths: &ShortestPaths,
         current_score: u32,
         minute: u32,
     ) -> u32 {
-        let reachable_valve_values =
-            self.thread
-                .reachable_valve_values(shortest_paths, open_valves, minute, valve_lookup);
+        let reachable_valve_values = self.thread.upper_bound_of_remaining_reachable_value(
+            shortest_paths,
+            open_valves,
+            minute,
+            valve_lookup,
+        );
         current_score + reachable_valve_values.values().sum::<u32>()
     }
 }
