@@ -291,10 +291,6 @@ impl<'a> PathCollection<'a> {
             //     return;
             // }
         }
-
-        // for old_path in old_paths.into_iter() {
-
-        // }
     }
 }
 
