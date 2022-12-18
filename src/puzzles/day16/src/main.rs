@@ -115,7 +115,7 @@ impl<'a> ValvePath<'a> {
             .all_shortest_paths_from(self.current_valve.name)
             .unwrap()
             .iter()
-            .filter(|(valve_name, _)| !self.open_valves.contains(**valve_name))
+            .filter(|(valve_name, _)| !self.open_valves.contains(*valve_name))
             .enumerate()
             .map(|(idx, (valve_name, path_length))| {
                 let min_minute_to_open_valve = minute + path_length + 1 + idx as u32;
@@ -188,7 +188,7 @@ fn main() {
     let mut paths = PathCollection::new(start_valve);
 
     for minute in 1..=MINUTES {
-        println!("minute: {minute}");
+        println!("minute: {minute}, path count: {}", paths.paths.len());
         paths.extend(&shortest_paths, &valve_lookup, minute);
     }
 

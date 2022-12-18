@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use crate::Valve;
 
 #[derive(Debug)]
-pub struct ShortestPaths<'a>(HashMap<&'a &'a str, HashMap<&'a &'a str, u32>>);
+pub struct ShortestPaths<'a>(HashMap<&'a str, HashMap<&'a str, u32>>);
 
-pub struct SortedShortestPaths<'a>(HashMap<&'a &'a str, Vec<(&'a &'a str, u32)>>);
+pub struct SortedShortestPaths<'a>(HashMap<&'a str, Vec<(&'a str, u32)>>);
 
 impl<'a> SortedShortestPaths<'a> {
-    pub fn all_shortest_paths_from(&'a self, source: &'a str) -> Option<&'a Vec<(&&str, u32)>> {
+    pub fn all_shortest_paths_from(&'a self, source: &'a str) -> Option<&'a Vec<(&str, u32)>> {
         self.0.get(&source)
     }
 }
@@ -25,13 +25,13 @@ impl<'a> ShortestPaths<'a> {
         Self(
             valve_lookup
                 .iter()
-                .map(|(valve_name, valve)| {
+                .map(|(&valve_name, valve)| {
                     (
                         valve_name,
                         valve
                             .neighbours
                             .iter()
-                            .flat_map(|neighbour_name| [(neighbour_name, 1), (valve_name, 0)])
+                            .flat_map(|&neighbour_name| [(neighbour_name, 1), (valve_name, 0)])
                             .collect(),
                     )
                 })
@@ -47,10 +47,10 @@ impl<'a> ShortestPaths<'a> {
         Self(
             valve_lookup
                 .keys()
-                .map(|source_valve_name| {
+                .map(|&source_valve_name| {
                     let inner_hashmap = valve_lookup
                         .keys()
-                        .filter_map(|target_valve_name| {
+                        .filter_map(|&target_valve_name| {
                             let shortest_path_not_using_k =
                                 self.shortest_path(source_valve_name, target_valve_name);
 
