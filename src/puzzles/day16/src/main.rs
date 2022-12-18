@@ -96,20 +96,25 @@ fn parse_valve(line: &str) -> (&str, Valve) {
     (name, Valve::new(name, flow_rate, neighbours))
 }
 
+fn part_one(valve_lookup: &HashMap<&str, Valve>, shortest_paths: &ShortestPaths) -> u32 {
+    let start_valve = valve_lookup.get("AA").unwrap();
+
+    let mut paths: PathCollection<SinglePath> =
+        PathCollection::new(start_valve, valve_lookup, shortest_paths);
+
+    for minute in 1..=MINUTES {
+        println!("minute: {minute}, path count: {}", paths.paths.len());
+        paths.extend(shortest_paths, valve_lookup, minute);
+    }
+
+    paths.best_score
+}
+
 fn main() {
     let input = read_input();
     let valve_lookup: HashMap<_, _> = input.lines().map(parse_valve).collect();
     let shortest_paths = floyd_warshall_shortest_paths(&valve_lookup);
 
-    let start_valve = valve_lookup.get("AA").unwrap();
-    let mut paths: PathCollection<SinglePath> =
-        PathCollection::new(start_valve, &valve_lookup, &shortest_paths);
-
-    for minute in 1..=MINUTES {
-        println!("minute: {minute}, path count: {}", paths.paths.len());
-        paths.extend(&shortest_paths, &valve_lookup, minute);
-    }
-
-    let part_1_answer = paths.best_score;
+    let part_1_answer = part_one(&valve_lookup, &shortest_paths);
     println!("part 1: {part_1_answer}");
 }
