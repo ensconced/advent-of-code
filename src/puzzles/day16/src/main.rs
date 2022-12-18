@@ -276,24 +276,20 @@ impl<'a> PathCollection<'a> {
     ) {
         let old_paths = std::mem::take(&mut self.paths);
         for old_path in old_paths.into_iter() {
+            // if old_path.score_upper_bound > self.max_score {
             let extended_paths =
                 old_path.all_possible_extensions(minute, valve_lookup, shortest_paths);
             for extended_path in extended_paths {
-                let score_upper_bound = ValvePath::final_score_upper_bound(
-                    extended_path.current_valve.name,
-                    &extended_path.open_valves,
-                    valve_lookup,
-                    shortest_paths,
-                    extended_path.score,
-                    minute,
-                );
-
-                if score_upper_bound > self.max_score {
+                if extended_path.score_upper_bound > self.max_score {
                     let extended_path_score = extended_path.score;
                     self.paths.push(extended_path);
                     self.max_score = u32::max(self.max_score, extended_path_score);
                 }
             }
+            // }
+            // else {
+            //     return;
+            // }
         }
     }
 }
