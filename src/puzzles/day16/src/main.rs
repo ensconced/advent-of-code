@@ -258,7 +258,6 @@ impl<'a> PathCollection<'a> {
     ) {
         let mut old_paths = std::mem::take(&mut self.paths);
         while let Some(old_path) = old_paths.pop() {
-            let old_path_clone = old_path.clone();
             if old_path.score_upper_bound > self.best_score {
                 if old_path.done {
                     self.paths.push(old_path);
@@ -267,11 +266,6 @@ impl<'a> PathCollection<'a> {
                         old_path.all_possible_extensions(minute, valve_lookup, shortest_paths);
 
                     while let Some(extended_path) = extended_paths.pop() {
-                        if extended_path.score > extended_path.score_upper_bound {
-                            dbg!(&old_path_clone);
-                            dbg!(&extended_path);
-                        }
-
                         if extended_path.score_upper_bound > self.best_score {
                             let extended_path_score = extended_path.score;
                             if extended_path_score > self.best_score {
