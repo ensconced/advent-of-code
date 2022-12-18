@@ -23,7 +23,7 @@ impl<'a> Valve<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct ValvePath<'a> {
     steps_since_opening_valve: usize,
     prev_steps: Vec<&'a str>,
@@ -164,9 +164,10 @@ impl<'a> PathCollection<'a> {
     ) {
         let old_paths = std::mem::take(&mut self.paths);
         for old_path in old_paths.into_iter() {
+            let clone = old_path.clone();
             let old_path_upper_bound =
-                old_path.final_score_upper_bound(valve_lookup, shortest_paths, minute, false);
-            let extended_paths = old_path.all_possible_extensions(minute, valve_lookup);
+                clone.final_score_upper_bound(valve_lookup, shortest_paths, minute, false);
+            let extended_paths = clone.all_possible_extensions(minute, valve_lookup);
             for extended_path in extended_paths {
                 let score_upper_bound = extended_path.final_score_upper_bound(
                     valve_lookup,
@@ -175,7 +176,11 @@ impl<'a> PathCollection<'a> {
                     false,
                 );
 
-                assert!(score_upper_bound <= old_path_upper_bound);
+                if score_upper_bound <= old_path_upper_bound {
+                    dbg!(&old_path);
+                    dbg!(&extended_path);
+                    panic!("well that's strange...");
+                }
 
                 if score_upper_bound > self.max_score {
                     let extended_path_score = extended_path.score;
@@ -653,8 +658,6 @@ fn main() {
 
     let start_valve = valve_lookup.get("AA").unwrap();
     let mut paths = PathCollection::new(start_valve);
-
-    assert!(paths.contains(&expected_paths[0]));
 
     for minute in 1..=MINUTES {
         println!("minute: {minute}");
