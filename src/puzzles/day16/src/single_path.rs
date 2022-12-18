@@ -27,6 +27,14 @@ impl<'a> ValveThread<'a> {
             current_valve: valve_lookup.get(valve).unwrap(),
         }
     }
+
+    fn open_valve(self) -> Self {
+        Self {
+            steps_since_opening_valve: 0,
+            prev_steps: self.prev_steps,
+            current_valve: self.current_valve,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -118,11 +126,7 @@ impl<'a> ValvePath<'a> {
             minute,
         );
         ValvePath {
-            thread: ValveThread {
-                steps_since_opening_valve: 0,
-                prev_steps: self.thread.prev_steps,
-                current_valve: self.thread.current_valve,
-            },
+            thread: self.thread.open_valve(),
             open_valves: self.open_valves,
             done: false,
             score,
