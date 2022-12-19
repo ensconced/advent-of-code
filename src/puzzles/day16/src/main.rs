@@ -39,7 +39,7 @@ impl<'a> PathCollection<'a> {
         valve_lookup: &'a HashMap<&'a str, Valve>,
         shortest_paths: &ShortestPaths,
     ) -> Self {
-        let path = ValvePath::new(start_valve, shortest_paths, valve_lookup);
+        let path = ValvePath::new(start_valve, shortest_paths, valve_lookup, 1);
         let mut candidate_paths = BinaryHeap::new();
         candidate_paths.push(path);
         Self {
@@ -68,7 +68,7 @@ impl<'a> PathCollection<'a> {
 
                     while let Some(extended_path) = extended_paths.pop() {
                         if extended_path.score_upper_bound > self.best_score {
-                            let extended_path_score = extended_path.thread.score;
+                            let extended_path_score = extended_path.score;
                             if extended_path_score > self.best_score {
                                 self.best_score = extended_path_score;
                             }

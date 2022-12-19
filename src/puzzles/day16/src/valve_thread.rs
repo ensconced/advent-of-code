@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use itertools::Itertools;
+
 use crate::{shortest_paths::ShortestPaths, Valve, MINUTES};
 
 #[derive(Clone, Debug)]
@@ -30,10 +32,10 @@ impl<'a> ValveThread<'a> {
         }
     }
 
-    pub fn move_to_valve(&self, valve: &str, valve_lookup: &'a HashMap<&str, Valve>) -> Self {
+    pub fn move_to_valve(&self, valve: &'a str, valve_lookup: &'a HashMap<&str, Valve>) -> Self {
         let mut prev_steps = self.prev_steps.clone();
         prev_steps.push(self.current_valve.name);
-        let actions = self.actions.clone();
+        let mut actions = self.actions.clone();
         actions.push(ThreadAction::Move(valve));
         Self {
             actions,
@@ -45,11 +47,11 @@ impl<'a> ValveThread<'a> {
         }
     }
 
-    pub fn open_valve(self, minute: u32) -> Self {
+    pub fn open_valve(mut self) -> Self {
         let mut opened_valves = self.opened_valves;
         opened_valves.insert(self.current_valve.name);
         self.actions
-            .push(ThreadAction::Move(self.current_valve.name));
+            .push(ThreadAction::OpenValve(self.current_valve.name));
         Self {
             actions: self.actions,
             steps_since_opening_valve: 0,
@@ -103,13 +105,12 @@ impl<'a> ValveThread<'a> {
         self,
         valve_lookup: &'a HashMap<&str, Valve>,
         open_valves: &HashSet<&str>,
-        minute: u32,
-    ) -> Vec<Self> {
+    ) -> Vec<ValveThread<'a>> {
         let mut result = Vec::new();
 
-        for path in self
-            .current_valve
-            .neighbours
+        let neighbours = &self.current_valve.neighbours;
+
+        for path in neighbours
             .iter()
             .map(|neighbour| self.move_to_valve(neighbour, valve_lookup))
             .filter(|thread| !thread.ends_with_pointless_cycle())
@@ -120,8 +121,36 @@ impl<'a> ValveThread<'a> {
         if open_valves.contains(self.current_valve.name) {
             result.push(self.do_nothing());
         } else if self.current_valve.flow_rate > 0 {
-            result.push(self.open_valve(minute));
+            result.push(self.open_valve());
         }
         result
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ThreadCombinationSet<'a> {
+    pub candidates: Vec<Vec<ValveThread<'a>>>,
+}
+
+impl<'a> ThreadCombinationSet<'a> {
+    pub fn add_thread_extensions(&self, thread_extensions: Vec<ValveThread<'a>>) -> Self {
+        ThreadCombinationSet {
+            candidates: self
+                .candidates
+                .iter()
+                .cartesian_product(thread_extensions)
+                .map(|(thread_set, new_thread)| {
+                    let mut threads = thread_set.clone();
+                    threads.push(new_thread);
+                    threads
+                })
+                .collect(),
+        }
+    }
+
+    pub fn new() -> Self {
+        Self {
+            candidates: vec![vec![]],
+        }
     }
 }
