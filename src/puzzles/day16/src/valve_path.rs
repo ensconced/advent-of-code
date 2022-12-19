@@ -1,12 +1,22 @@
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::{
+    collections::{BinaryHeap, HashMap, HashSet},
+    iter::repeat_with,
+};
 
-use crate::{shortest_paths::ShortestPaths, valve_thread::ValveThread, Valve};
+use itertools::Itertools;
+
+use crate::{
+    shortest_paths::ShortestPaths,
+    valve_thread::{ThreadAction, ValveThread},
+    Valve,
+};
 
 #[derive(Clone, Debug)]
 pub struct ValvePath<'a> {
     pub done: bool,
     pub score_upper_bound: u32,
-    pub thread: ValveThread<'a>,
+    pub threads: Vec<ValveThread<'a>>,
+    score: u32,
     open_valves: HashSet<&'a str>,
 }
 
@@ -15,12 +25,16 @@ impl<'a> ValvePath<'a> {
         start_valve: &'a Valve,
         shortest_paths: &ShortestPaths,
         valve_lookup: &'a HashMap<&'a str, Valve>,
+        thread_count: usize,
     ) -> Self {
         let minute = 0;
         let open_valves = HashSet::new();
 
         let mut result = Self {
-            thread: ValveThread::new(start_valve),
+            score: 0,
+            threads: repeat_with(|| ValveThread::new(start_valve))
+                .take(thread_count)
+                .collect(),
             open_valves,
             done: false,
             score_upper_bound: 0,
@@ -42,16 +56,49 @@ impl<'a> ValvePath<'a> {
         valve_lookup: &'a HashMap<&str, Valve>,
         shortest_paths: &ShortestPaths,
     ) -> BinaryHeap<ValvePath<'a>> {
-        self.thread
-            .all_possible_extensions(valve_lookup, &self.open_valves, minute)
+        let all_thread_possibilities = self
+            .threads
+            .iter()
+            .map(|thread| thread.all_possible_extensions(valve_lookup, &self.open_valves, minute))
+            .fold(Vec::<Vec<ValveThread>>::new(), |acc, x| {
+                acc.into_iter()
+                    .cartesian_product(x)
+                    .map(|(threads, another_thread)| {
+                        let combined_threads = threads.clone();
+                        threads.push(another_thread);
+                        combined_threads
+                    })
+                    .collect()
+            });
+
+        all_thread_possibilities
             .into_iter()
-            .map(|extended_thread| {
+            .map(|threads| {
+                let opened_valve_counts = HashMap::new();
+                for thread in threads {
+                    if let Some(ThreadAction::OpenValve(opened_valve)) = thread.actions.last() {
+                        opened_valve_counts
+                            .entry(opened_valve)
+                            .and_modify(|x| *x = *x + 1)
+                            .or_insert(1);
+                    }
+                }
+                (threads, opened_valve_counts)
+            })
+            .filter(|(threads, opened_valve_counts)| opened_valve_counts.iter().any(|k, v| v > 1))
+            .map(|(extended_threads, opened_valve_counts)| {
+                // let score = if let Some(opened_valve_name) = e
+
                 let mut path = ValvePath {
-                    done: extended_thread.done,
+                    score,
+                    done: extended_threads.iter().all(|thread| thread.done),
                     score_upper_bound: 0,
-                    open_valves: extended_thread.opened_valves.clone(),
-                    thread: extended_thread,
+                    open_valves: extended_threads.iter().fold(HashSet::new(), |acc, thread| {
+                        thread.opened_valves.union(&acc).cloned().collect()
+                    }),
+                    threads: extended_threads,
                 };
+
                 path.score_upper_bound = path.final_score_upper_bound(
                     &path.open_valves,
                     valve_lookup,
@@ -70,13 +117,22 @@ impl<'a> ValvePath<'a> {
         shortest_paths: &ShortestPaths,
         minute: u32,
     ) -> u32 {
-        let reachable_valve_values = self.thread.upper_bound_of_remaining_reachable_value(
-            shortest_paths,
-            open_valves,
-            minute,
-            valve_lookup,
-        );
-        self.thread.score + reachable_valve_values.values().sum::<u32>()
+        let reachable_valve_values = self.threads.iter().fold(HashMap::new(), |acc, thread| {
+            thread
+                .upper_bound_of_remaining_reachable_value(
+                    shortest_paths,
+                    &self.open_valves,
+                    minute,
+                    valve_lookup,
+                )
+                .into_iter()
+                .map(|(k, v)| {
+                    let min_dist = acc.get(k).map(|acc_v| u32::min(*acc_v, v)).unwrap_or(v);
+                    (k, min_dist)
+                })
+                .collect()
+        });
+        self.score + reachable_valve_values.values().sum::<u32>()
     }
 }
 

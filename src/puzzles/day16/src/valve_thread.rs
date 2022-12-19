@@ -3,11 +3,17 @@ use std::collections::{HashMap, HashSet};
 use crate::{shortest_paths::ShortestPaths, Valve, MINUTES};
 
 #[derive(Clone, Debug)]
+pub enum ThreadAction<'a> {
+    Move(&'a str),
+    OpenValve(&'a str),
+}
+
+#[derive(Clone, Debug)]
 pub struct ValveThread<'a> {
+    pub actions: Vec<ThreadAction<'a>>,
     pub current_valve: &'a Valve<'a>,
     pub prev_steps: Vec<&'a str>,
     pub steps_since_opening_valve: usize,
-    pub score: u32,
     pub done: bool,
     pub opened_valves: HashSet<&'a str>,
 }
@@ -15,8 +21,8 @@ pub struct ValveThread<'a> {
 impl<'a> ValveThread<'a> {
     pub fn new(start_valve: &'a Valve) -> Self {
         Self {
+            actions: vec![],
             steps_since_opening_valve: 0,
-            score: 0,
             prev_steps: vec![],
             current_valve: start_valve,
             opened_valves: HashSet::new(),
@@ -27,9 +33,11 @@ impl<'a> ValveThread<'a> {
     pub fn move_to_valve(&self, valve: &str, valve_lookup: &'a HashMap<&str, Valve>) -> Self {
         let mut prev_steps = self.prev_steps.clone();
         prev_steps.push(self.current_valve.name);
+        let actions = self.actions.clone();
+        actions.push(ThreadAction::Move(valve));
         Self {
+            actions,
             steps_since_opening_valve: self.steps_since_opening_valve + 1,
-            score: self.score,
             prev_steps,
             current_valve: valve_lookup.get(valve).unwrap(),
             opened_valves: self.opened_valves.clone(),
@@ -40,9 +48,11 @@ impl<'a> ValveThread<'a> {
     pub fn open_valve(self, minute: u32) -> Self {
         let mut opened_valves = self.opened_valves;
         opened_valves.insert(self.current_valve.name);
+        self.actions
+            .push(ThreadAction::Move(self.current_valve.name));
         Self {
+            actions: self.actions,
             steps_since_opening_valve: 0,
-            score: self.score + self.current_valve.flow_rate * (MINUTES - minute),
             prev_steps: self.prev_steps,
             current_valve: self.current_valve,
             opened_valves,
