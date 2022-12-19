@@ -67,7 +67,7 @@ impl<'a> ValveThread<'a> {
         self
     }
 
-    pub fn upper_bound_of_remaining_reachable_value(
+    pub fn remaining_reachable_values(
         &self,
         shortest_paths: &'a ShortestPaths,
         open_valves: &HashSet<&str>,

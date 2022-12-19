@@ -50,17 +50,16 @@ impl<'a> ValvePath<'a> {
         valve_lookup: &'a HashMap<&str, Valve>,
         shortest_paths: &ShortestPaths,
     ) -> BinaryHeap<ValvePath<'a>> {
-        let thread_extensions = self
+        let all_thread_combinations = self
             .threads
             .into_iter()
-            .map(|thread| thread.all_possible_extensions(valve_lookup, &self.open_valves));
-
-        let all_thread_combinations = thread_extensions.fold(
-            ThreadCombinationSet::new(),
-            |thread_combination_set, thread_extensions| {
-                thread_combination_set.add_thread_extensions(thread_extensions)
-            },
-        );
+            .map(|thread| thread.all_possible_extensions(valve_lookup, &self.open_valves))
+            .fold(
+                ThreadCombinationSet::new(),
+                |thread_combination_set, thread_extensions| {
+                    thread_combination_set.add_thread_extensions(thread_extensions)
+                },
+            );
 
         all_thread_combinations
             .candidates
@@ -80,8 +79,8 @@ impl<'a> ValvePath<'a> {
             .filter(|(_, opened_valve_counts)| !opened_valve_counts.iter().any(|(_, v)| *v > 1))
             .map(|(extended_threads, opened_valve_counts)| {
                 let score = opened_valve_counts
-                    .iter()
-                    .fold(self.score, |acc, (&valve_name, _)| {
+                    .keys()
+                    .fold(self.score, |acc, &valve_name| {
                         acc + valve_lookup.get(valve_name).unwrap().flow_rate * (MINUTES - minute)
                     });
 
@@ -110,16 +109,11 @@ impl<'a> ValvePath<'a> {
     ) -> u32 {
         let reachable_valve_values = self.threads.iter().fold(HashMap::new(), |acc, thread| {
             thread
-                .upper_bound_of_remaining_reachable_value(
-                    shortest_paths,
-                    &self.open_valves,
-                    minute,
-                    valve_lookup,
-                )
+                .remaining_reachable_values(shortest_paths, &self.open_valves, minute, valve_lookup)
                 .into_iter()
                 .map(|(k, v)| {
-                    let min_dist = acc.get(k).map(|acc_v| u32::min(*acc_v, v)).unwrap_or(v);
-                    (k, min_dist)
+                    let max_val = acc.get(k).map(|acc_v| u32::max(*acc_v, v)).unwrap_or(v);
+                    (k, max_val)
                 })
                 .collect()
         });
