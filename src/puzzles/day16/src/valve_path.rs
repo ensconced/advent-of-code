@@ -107,7 +107,7 @@ impl<'a> ValvePath<'a> {
         shortest_paths: &ShortestPaths,
         minute: u32,
     ) -> u32 {
-        let reachable_valve_values = self.threads.iter().fold(HashMap::new(), |acc, thread| {
+        let reachable_values = self.threads.iter().fold(HashMap::new(), |acc, thread| {
             thread
                 .remaining_reachable_values(shortest_paths, &self.open_valves, minute, valve_lookup)
                 .into_iter()
@@ -117,7 +117,7 @@ impl<'a> ValvePath<'a> {
                 })
                 .collect()
         });
-        self.score + reachable_valve_values.values().sum::<u32>()
+        self.score + reachable_values.values().sum::<u32>()
     }
 }
 
