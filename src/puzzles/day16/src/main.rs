@@ -39,6 +39,33 @@ enum Thread<'a> {
     },
 }
 
+// struct AllExtensions<'a> {
+//     head: &'a Thread<'a>,
+//     head_extensions: Box<dyn Iterator<Item = Thread<'a>>>,
+// }
+
+// impl<'a> AllExtensions<'a> {
+//     fn new(
+//         head: &'a Thread<'a>,
+//         shortest_paths: &'static ShortestPaths,
+//         total_runtime: u32,
+//     ) -> Self {
+//         let asdf = Box::new(head.extensions(shortest_paths, total_runtime));
+//         Self {
+//             head,
+//             head_extensions: asdf,
+//         }
+//     }
+// }
+
+// impl<'a> Iterator for AllExtensions<'a> {
+//     type Item = Thread<'a>;
+
+//     fn next(&mut self) -> Option<Self::Item> {
+//         todo!()
+//     }
+// }
+
 impl<'a> Thread<'a> {
     fn minute_opened(&self) -> u32 {
         match self {
@@ -83,11 +110,7 @@ impl<'a> Thread<'a> {
         }
     }
 
-    fn extensions(
-        &'a self,
-        shortest_paths: &'a ShortestPaths,
-        total_runtime: u32,
-    ) -> impl Iterator<Item = Thread<'a>> {
+    fn extensions(&'a self, shortest_paths: &'a ShortestPaths, total_runtime: u32) -> Vec<Thread> {
         let current_valve = match self {
             Self::Start => "AA",
             Self::Extension { opened_valve, .. } => opened_valve,
@@ -105,6 +128,7 @@ impl<'a> Thread<'a> {
                     prev: self,
                 })
             })
+            .collect()
     }
 }
 
