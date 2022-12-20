@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::{shortest_paths::ShortestPaths, Valve, ValveLookup, MINUTES};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ThreadAction {
     Move(&'static str),
     OpenValve(&'static str),
@@ -22,7 +22,6 @@ impl ThreadAction {
 #[derive(Clone, Debug)]
 pub struct ValveThread {
     pub actions: Vec<ThreadAction>,
-    pub steps_since_opening_valve: usize,
     pub done: bool,
     pub opened_valves: HashSet<&'static str>,
 }
@@ -30,8 +29,7 @@ pub struct ValveThread {
 impl ValveThread {
     pub fn new(start_valve: &Valve) -> Self {
         Self {
-            actions: vec![ThreadAction::Move(&start_valve.name)],
-            steps_since_opening_valve: 0,
+            actions: vec![ThreadAction::Move(start_valve.name)],
             opened_valves: HashSet::new(),
             done: false,
         }
@@ -42,7 +40,6 @@ impl ValveThread {
         actions.push(ThreadAction::Move(valve));
         Self {
             actions,
-            steps_since_opening_valve: self.steps_since_opening_valve + 1,
             opened_valves: self.opened_valves.clone(),
             done: false,
         }
@@ -59,7 +56,6 @@ impl ValveThread {
         actions.push(ThreadAction::OpenValve(self.current_valve_name()));
         Self {
             actions,
-            steps_since_opening_valve: 0,
             opened_valves,
             done: false,
         }
@@ -73,15 +69,15 @@ impl ValveThread {
     pub fn remaining_reachable_values(
         &self,
         shortest_paths: &ShortestPaths,
-        open_valves: &HashSet<&str>,
+        open_valves: &HashSet<&'static str>,
         minute: u32,
         valve_lookup: &ValveLookup,
-    ) -> HashMap<&str, u32> {
+    ) -> HashMap<&'static str, u32> {
         shortest_paths
             .all_shortest_paths_from(self.current_valve_name())
             .unwrap()
             .iter()
-            .filter(|(valve_name, _)| !open_valves.contains(*valve_name))
+            .filter(|(&valve_name, _)| !open_valves.contains(valve_name))
             .map(|(&valve_name, path_length)| {
                 let min_minute_to_open_valve = minute + path_length + 1;
                 let value = if min_minute_to_open_valve >= MINUTES {
@@ -97,12 +93,12 @@ impl ValveThread {
     }
 
     pub fn ends_with_pointless_cycle(&self) -> bool {
-        self.actions
+        !self
+            .actions
             .iter()
-            .filter(|action| matches!(action, ThreadAction::Move(_)))
             .rev()
-            .take(self.steps_since_opening_valve)
-            .any(|el| el.valve() == self.current_valve_name())
+            .take_while(|action| matches!(action, ThreadAction::Move(_)))
+            .all_unique()
     }
 
     pub fn all_possible_extensions(
