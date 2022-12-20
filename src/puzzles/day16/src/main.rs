@@ -1,6 +1,5 @@
 mod parser;
 mod shortest_paths;
-mod valve_path;
 use std::collections::{HashMap, HashSet};
 
 use shortest_paths::ShortestPaths;
