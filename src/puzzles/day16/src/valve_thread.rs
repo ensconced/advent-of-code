@@ -24,6 +24,7 @@ impl ThreadAction {
 
 #[derive(Clone, Debug)]
 pub struct ValveThread {
+    pub minutes_remaining: u32,
     pub actions: Vec<ThreadAction>,
     pub done: bool,
 }
@@ -36,18 +37,21 @@ impl ValveThread {
                 distance: 0,
             }],
             done: false,
+            minutes_remaining: 30,
         }
     }
 
     pub fn move_to_valve(&self, valve: &'static str) -> Self {
+        let distance = 1; // TODO - allow other values
         let mut actions = self.actions.clone();
         actions.push(ThreadAction::Move {
             valve_name: valve,
-            distance: 1,
+            distance,
         });
         Self {
             actions,
             done: false,
+            minutes_remaining: self.minutes_remaining - distance,
         }
     }
 
@@ -61,6 +65,7 @@ impl ValveThread {
         Self {
             actions,
             done: false,
+            minutes_remaining: self.minutes_remaining - 1,
         }
     }
 
