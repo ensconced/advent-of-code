@@ -35,7 +35,7 @@ impl Valve {
 
 struct PathCollection {
     candidate_paths: BinaryHeap<ValvePath>,
-    best_score: u32,
+    best_path: Option<ValvePath>,
 }
 
 impl PathCollection {
@@ -49,8 +49,15 @@ impl PathCollection {
         candidate_paths.push(path);
         Self {
             candidate_paths,
-            best_score: 0,
+            best_path: None,
         }
+    }
+
+    fn best_score(&self) -> u32 {
+        self.best_path
+            .as_ref()
+            .map(|best_path| best_path.score)
+            .unwrap_or(0)
     }
 
     fn extend_candidate_paths(
@@ -61,7 +68,7 @@ impl PathCollection {
     ) {
         let mut prev_candidate_paths = std::mem::take(&mut self.candidate_paths);
         while let Some(old_candidate_path) = prev_candidate_paths.pop() {
-            if old_candidate_path.score_upper_bound > self.best_score {
+            if old_candidate_path.score_upper_bound > self.best_score() {
                 if old_candidate_path.done {
                     self.candidate_paths.push(old_candidate_path);
                 } else {
@@ -72,10 +79,10 @@ impl PathCollection {
                     );
 
                     while let Some(extended_path) = extended_paths.pop() {
-                        if extended_path.score_upper_bound > self.best_score {
+                        if extended_path.score_upper_bound > self.best_score() {
                             let extended_path_score = extended_path.score;
-                            if extended_path_score > self.best_score {
-                                self.best_score = extended_path_score;
+                            if extended_path_score > self.best_score() {
+                                self.best_path = Some(extended_path.clone());
                             }
                             self.candidate_paths.push(extended_path);
                         } else {
@@ -105,7 +112,7 @@ fn part_one(valve_lookup: &ValveLookup, shortest_paths: &ShortestPaths) -> u32 {
         paths.extend_candidate_paths(shortest_paths, valve_lookup, minute);
     }
 
-    paths.best_score
+    paths.best_score()
 }
 
 fn main() {
