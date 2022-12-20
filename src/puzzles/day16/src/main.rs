@@ -56,7 +56,7 @@ impl<'a> Thread<'a> {
         }
     }
 
-    fn score(&self, valve_lookup: &ValveLookup) -> u32 {
+    fn score(&self, valve_lookup: &ValveLookup, total_runtime: u32) -> u32 {
         match self {
             Self::Start => 0,
             Self::Extension {
@@ -65,23 +65,29 @@ impl<'a> Thread<'a> {
                 prev,
             } => {
                 let valve = valve_lookup.get(opened_valve).unwrap();
-                valve.flow_rate * (30 - minute_opened) + prev.score(valve_lookup)
+                valve.flow_rate * (total_runtime - minute_opened)
+                    + prev.score(valve_lookup, total_runtime)
             }
         }
     }
 
-    fn visit_recursively<F: FnMut(&Thread)>(
+    fn for_each_extension<F: FnMut(&Thread)>(
         &self,
         shortest_paths: &'a ShortestPaths,
+        total_runtime: u32,
         visit: &mut F,
     ) {
         visit(self);
-        for extension in self.extensions(shortest_paths) {
-            extension.visit_recursively(shortest_paths, visit);
+        for extension in self.extensions(shortest_paths, total_runtime) {
+            extension.for_each_extension(shortest_paths, total_runtime, visit);
         }
     }
 
-    fn extensions(&'a self, shortest_paths: &'a ShortestPaths) -> impl Iterator<Item = Thread<'a>> {
+    fn extensions(
+        &'a self,
+        shortest_paths: &'a ShortestPaths,
+        total_runtime: u32,
+    ) -> impl Iterator<Item = Thread<'a>> {
         let current_valve = match self {
             Self::Start => "AA",
             Self::Extension { opened_valve, .. } => opened_valve,
@@ -90,9 +96,9 @@ impl<'a> Thread<'a> {
             .all_shortest_paths_from(current_valve)
             .unwrap()
             .iter()
-            .filter_map(|(target, path_length)| {
+            .filter_map(move |(target, path_length)| {
                 let minute_opened = self.minute_opened() + path_length + 1;
-                let can_open_valve = minute_opened < 30 && !self.valve_is_open(target);
+                let can_open_valve = minute_opened < total_runtime && !self.valve_is_open(target);
                 can_open_valve.then_some(Thread::Extension {
                     minute_opened,
                     opened_valve: target,
@@ -110,8 +116,9 @@ fn main() {
 
     let start = Thread::Start;
     let mut part_1_answer = 0;
-    start.visit_recursively(&shortest_paths, &mut |thread| {
-        part_1_answer = u32::max(part_1_answer, thread.score(&valve_lookup));
+    let total_runtime = 30;
+    start.for_each_extension(&shortest_paths, total_runtime, &mut |thread| {
+        part_1_answer = u32::max(part_1_answer, thread.score(&valve_lookup, total_runtime));
     });
     println!("part 1: {part_1_answer}")
 }
