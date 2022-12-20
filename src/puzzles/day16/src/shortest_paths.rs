@@ -6,18 +6,37 @@ use crate::{Valve, ValveLookup};
 pub struct ShortestPaths(HashMap<&'static str, HashMap<&'static str, u32>>);
 
 impl ShortestPaths {
-    pub fn all_shortest_paths_from(
-        &self,
-        source: &'static str,
-    ) -> Option<&HashMap<&'static str, u32>> {
+    pub fn all_shortest_paths_from(&self, source: &str) -> Option<&HashMap<&'static str, u32>> {
         self.0.get(&source)
     }
 
-    fn shortest_path(&self, source: &str, target: &str) -> Option<u32> {
-        self.0
-            .get(&source)
+    pub fn shortest_path(&self, source: &str, target: &str) -> Option<u32> {
+        self.all_shortest_paths_from(source)
             .and_then(|inner_map| inner_map.get(&target))
             .cloned()
+    }
+
+    pub fn filter_out_faulty_valves(self, valve_lookup: &ValveLookup) -> Self {
+        ShortestPaths(
+            self.0
+                .into_iter()
+                .filter(|(source, _)| {
+                    let source_flow_rate = valve_lookup.get(source).unwrap().flow_rate;
+                    *source == "AA" || source_flow_rate > 0
+                })
+                .map(|(source, shortest_paths_from_source)| {
+                    let filtered_paths = shortest_paths_from_source
+                        .into_iter()
+                        .filter(|(target, _)| {
+                            let target_flow_rate = valve_lookup.get(*target).unwrap().flow_rate;
+                            target_flow_rate > 0
+                        })
+                        .collect();
+
+                    (source, filtered_paths)
+                })
+                .collect(),
+        )
     }
 
     pub fn initialise(valve_lookup: &HashMap<&'static str, Valve>) -> Self {
@@ -75,7 +94,7 @@ impl ShortestPaths {
     }
 }
 
-pub fn floyd_warshall_shortest_paths<'a>(valve_lookup: &ValveLookup) -> ShortestPaths {
+pub fn floyd_warshall_shortest_paths(valve_lookup: &ValveLookup) -> ShortestPaths {
     valve_lookup
         .values()
         .fold(ShortestPaths::initialise(valve_lookup), |acc, valve| {

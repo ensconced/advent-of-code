@@ -2,13 +2,11 @@ mod parser;
 mod shortest_paths;
 mod valve_path;
 mod valve_thread;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use shortest_paths::ShortestPaths;
 
-use crate::{
-    parser::parse_valve, shortest_paths::floyd_warshall_shortest_paths, valve_path::ValvePath,
-};
+use crate::{parser::parse_valve, shortest_paths::floyd_warshall_shortest_paths};
 
 pub type ValveLookup = HashMap<&'static str, Valve>;
 
@@ -33,113 +31,50 @@ impl Valve {
     }
 }
 
-struct PathCollection {
-    candidate_paths: BinaryHeap<ValvePath>,
-    best_path: Option<ValvePath>,
+enum Thread<'a> {
+    Start,
+    Extension {
+        opened_valve: &'static str,
+        minute_opened: u32,
+        prev: &'a Thread<'a>,
+    },
 }
 
-impl PathCollection {
-    fn new(
-        start_valve: &Valve,
-        valve_lookup: &ValveLookup,
-        shortest_paths: &ShortestPaths,
-        total_minutes: u32,
-        thread_count: usize,
-    ) -> Self {
-        let path = ValvePath::new(
-            start_valve,
-            shortest_paths,
-            valve_lookup,
-            thread_count,
-            total_minutes,
-        );
-        let mut candidate_paths = BinaryHeap::new();
-        candidate_paths.push(path);
-        Self {
-            candidate_paths,
-            best_path: None,
+impl<'a> Thread<'a> {
+    fn minute_opened(&self) -> u32 {
+        match self {
+            Self::Start => 0,
+            Self::Extension { minute_opened, .. } => *minute_opened,
         }
     }
 
-    fn best_score(&self) -> u32 {
-        self.best_path
-            .as_ref()
-            .map(|best_path| best_path.score)
-            .unwrap_or(0)
-    }
-
-    fn extend_candidate_paths(
-        &mut self,
-        shortest_paths: &ShortestPaths,
-        valve_lookup: &ValveLookup,
-    ) {
-        let mut prev_candidate_paths = std::mem::take(&mut self.candidate_paths);
-        while let Some(old_candidate_path) = prev_candidate_paths.pop() {
-            if old_candidate_path.score_upper_bound > self.best_score() {
-                if old_candidate_path.done {
-                    self.candidate_paths.push(old_candidate_path);
-                } else {
-                    let mut extended_paths =
-                        old_candidate_path.all_possible_extensions(valve_lookup, shortest_paths);
-
-                    while let Some(extended_path) = extended_paths.pop() {
-                        if extended_path.score_upper_bound > self.best_score() {
-                            let extended_path_score = extended_path.score;
-                            if extended_path_score > self.best_score() {
-                                self.best_path = Some(extended_path.clone());
-                            }
-                            self.candidate_paths.push(extended_path);
-                        } else {
-                            break;
-                        }
-                    }
-                }
-            } else {
-                break;
-            }
-        }
+    fn extensions(&'a self, shortest_paths: &'a ShortestPaths) -> impl Iterator<Item = Thread<'a>> {
+        let current_valve = match self {
+            Self::Start => "AA",
+            Self::Extension { opened_valve, .. } => opened_valve,
+        };
+        shortest_paths
+            .all_shortest_paths_from(current_valve)
+            .unwrap()
+            .iter()
+            .filter_map(|(target, path_length)| {
+                let minute_opened = self.minute_opened() + path_length + 1;
+                (minute_opened < 30).then_some(Thread::Extension {
+                    minute_opened,
+                    opened_valve: target,
+                    prev: self,
+                })
+            })
     }
 }
-
-fn part_one(valve_lookup: &ValveLookup, shortest_paths: &ShortestPaths) -> u32 {
-    let start_valve = valve_lookup.get("AA").unwrap();
-
-    let runtime = 30;
-    let mut paths = PathCollection::new(start_valve, valve_lookup, shortest_paths, runtime, 1);
-
-    while paths.candidate_paths.iter().any(|path| !path.done) {
-        println!("extending...path count: {}", paths.candidate_paths.len());
-        paths.extend_candidate_paths(shortest_paths, valve_lookup);
-    }
-
-    paths.best_score()
-}
-
-// fn part_two(valve_lookup: &ValveLookup, shortest_paths: &ShortestPaths) -> u32 {
-//     let start_valve = valve_lookup.get("AA").unwrap();
-
-//     let runtime = 26;
-//     let mut paths = PathCollection::new(start_valve, valve_lookup, shortest_paths, runtime, 2);
-
-//     for minute in 1..=runtime {
-//         println!(
-//             "minute: {minute}, path count: {}",
-//             paths.candidate_paths.len()
-//         );
-//         paths.extend_candidate_paths(shortest_paths, valve_lookup, runtime);
-//     }
-
-//     paths.best_score()
-// }
 
 fn main() {
     let input = include_str!("../input.txt");
     let valve_lookup: ValveLookup = input.lines().map(parse_valve).collect();
-    let shortest_paths = floyd_warshall_shortest_paths(&valve_lookup);
+    let graph =
+        floyd_warshall_shortest_paths(&valve_lookup).filter_out_faulty_valves(&valve_lookup);
 
-    let part_1_answer = part_one(&valve_lookup, &shortest_paths);
-    println!("part 1: {part_1_answer}");
+    let start = Thread::Start;
 
-    // let part_2_answer = part_two(&valve_lookup, &shortest_paths);
-    // println!("part 2: {part_2_answer}");
+    dbg!(&graph);
 }

@@ -82,66 +82,66 @@ impl ValveThread {
         self
     }
 
-    fn reachable_open_valves(
-        &self,
-        shortest_paths: &ShortestPaths,
-        open_valves: &HashSet<&'static str>,
-    ) -> HashMap<&'static str, u32> {
-        shortest_paths
-            .all_shortest_paths_from(self.current_valve_name())
-            .unwrap()
-            .iter()
-            .filter(|(&valve_name, _)| !open_valves.contains(valve_name))
-            .map(|(&valve_name, &distance)| (valve_name, distance))
-            .collect()
-    }
+    // fn reachable_open_valves(
+    //     &self,
+    //     shortest_paths: &ShortestPaths,
+    //     open_valves: &HashSet<&'static str>,
+    // ) -> HashMap<&'static str, u32> {
+    //     shortest_paths
+    //         .all_shortest_paths_from(self.current_valve_name())
+    //         .unwrap()
+    //         .iter()
+    //         .filter(|(&valve_name, _)| !open_valves.contains(valve_name))
+    //         .map(|(&valve_name, &distance)| (valve_name, distance))
+    //         .collect()
+    // }
 
-    pub fn remaining_reachable_values(
-        &self,
-        shortest_paths: &ShortestPaths,
-        open_valves: &HashSet<&'static str>,
-        valve_lookup: &ValveLookup,
-    ) -> HashMap<&'static str, u32> {
-        self.reachable_open_valves(shortest_paths, open_valves)
-            .into_iter()
-            .map(|(valve_name, path_length)| {
-                let time_to_open_valve = path_length + 1;
-                let value = if time_to_open_valve >= self.minutes_remaining {
-                    0
-                } else {
-                    let max_minutes_of_flow = self.minutes_remaining - time_to_open_valve;
-                    let flow_rate = valve_lookup.get(valve_name).unwrap().flow_rate;
-                    flow_rate * max_minutes_of_flow
-                };
-                (valve_name, value)
-            })
-            .collect()
-    }
+    // pub fn remaining_reachable_values(
+    //     &self,
+    //     shortest_paths: &ShortestPaths,
+    //     open_valves: &HashSet<&'static str>,
+    //     valve_lookup: &ValveLookup,
+    // ) -> HashMap<&'static str, u32> {
+    // self.reachable_open_valves(shortest_paths, open_valves)
+    //     .into_iter()
+    //     .map(|(valve_name, path_length)| {
+    //         let time_to_open_valve = path_length + 1;
+    //         let value = if time_to_open_valve >= self.minutes_remaining {
+    //             0
+    //         } else {
+    //             let max_minutes_of_flow = self.minutes_remaining - time_to_open_valve;
+    //             let flow_rate = valve_lookup.get(valve_name).unwrap().flow_rate;
+    //             flow_rate * max_minutes_of_flow
+    //         };
+    //         (valve_name, value)
+    //     })
+    //     .collect()
+    // }
 
-    pub fn all_possible_extensions(
-        self,
-        open_valves: &HashSet<&'static str>,
-        valve_lookup: &ValveLookup,
-        shortest_paths: &ShortestPaths,
-    ) -> Vec<ValveThread> {
-        let mut result = Vec::new();
+    // pub fn all_possible_extensions(
+    //     self,
+    //     open_valves: &HashSet<&'static str>,
+    //     valve_lookup: &ValveLookup,
+    //     shortest_paths: &ShortestPaths,
+    // ) -> Vec<ValveThread> {
+    //     let mut result = Vec::new();
 
-        for path in self
-            .reachable_open_valves(shortest_paths, open_valves)
-            .into_iter()
-            .filter(|(_, distance)| distance + 1 < self.minutes_remaining)
-            .map(|(neighbour, distance)| {
-                self.move_to_and_open_valve(neighbour, distance, valve_lookup)
-            })
-        {
-            result.push(path);
-        }
+    //     for path in self
+    //         .reachable_open_valves(shortest_paths, open_valves)
+    //         .into_iter()
+    //         .filter(|(_, distance)| distance + 1 < self.minutes_remaining)
+    //         .map(|(neighbour, distance)| {
+    //             self.move_to_and_open_valve(neighbour, distance, valve_lookup)
+    //         })
+    //     {
+    //         result.push(path);
+    //     }
 
-        if open_valves.contains(self.current_valve_name()) {
-            result.push(self.do_nothing());
-        }
-        result
-    }
+    //     if open_valves.contains(self.current_valve_name()) {
+    //         result.push(self.do_nothing());
+    //     }
+    //     result
+    // }
 }
 
 #[derive(Clone, Debug)]
