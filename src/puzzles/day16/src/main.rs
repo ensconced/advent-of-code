@@ -1,6 +1,10 @@
 mod parser;
 mod shortest_paths;
-use std::collections::{HashMap, HashSet};
+use std::{
+    borrow::Borrow,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use shortest_paths::ShortestPaths;
 
@@ -30,12 +34,12 @@ impl Valve {
 }
 
 #[derive(Debug)]
-enum Thread<'a> {
+enum Thread {
     Start,
     Extension {
         opened_valve: &'static str,
         minute_opened: u32,
-        prev: &'a Thread<'a>,
+        prev: Rc<Thread>,
     },
 }
 
@@ -75,7 +79,7 @@ enum Thread<'a> {
 //     }
 // }
 
-impl<'a> Thread<'a> {
+impl<'a> Thread {
     fn minute_opened(&self) -> u32 {
         match self {
             Self::Start => 0,
@@ -107,8 +111,8 @@ impl<'a> Thread<'a> {
         }
     }
 
-    fn for_each_extension<F: FnMut(&Thread)>(
-        &self,
+    fn for_each_extension<F: FnMut(Rc<Thread>)>(
+        self: Rc<Self>,
         shortest_paths: &'a ShortestPaths,
         total_runtime: u32,
         visit: &mut F,
@@ -119,10 +123,14 @@ impl<'a> Thread<'a> {
         visit(self);
     }
 
-    fn extensions(&'a self, shortest_paths: &'a ShortestPaths, total_runtime: u32) -> Vec<Thread> {
-        let current_valve = match self {
-            Self::Start => "AA",
-            Self::Extension { opened_valve, .. } => opened_valve,
+    fn extensions(
+        self: &Rc<Self>,
+        shortest_paths: &'a ShortestPaths,
+        total_runtime: u32,
+    ) -> Vec<Rc<Thread>> {
+        let current_valve = match self.borrow() {
+            Thread::Start => "AA",
+            Thread::Extension { opened_valve, .. } => opened_valve,
         };
         shortest_paths
             .all_shortest_paths_from(current_valve)
@@ -131,11 +139,11 @@ impl<'a> Thread<'a> {
             .filter_map(move |(target, path_length)| {
                 let minute_opened = self.minute_opened() + path_length + 1;
                 let can_open_valve = minute_opened < total_runtime && !self.valve_is_open(target);
-                can_open_valve.then_some(Thread::Extension {
+                can_open_valve.then_some(Rc::new(Thread::Extension {
                     minute_opened,
                     opened_valve: target,
-                    prev: self,
-                })
+                    prev: self.clone(),
+                }))
             })
             .collect()
     }
@@ -147,7 +155,7 @@ fn main() {
     let shortest_paths =
         floyd_warshall_shortest_paths(&valve_lookup).filter_out_faulty_valves(&valve_lookup);
 
-    let start = Thread::Start;
+    let start = Rc::new(Thread::Start);
 
     let mut part_1_answer = 0;
     let total_runtime = 30;
