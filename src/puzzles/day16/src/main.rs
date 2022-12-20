@@ -40,29 +40,38 @@ enum Thread<'a> {
 }
 
 // struct AllExtensions<'a> {
-//     head: &'a Thread<'a>,
-//     head_extensions: Box<dyn Iterator<Item = Thread<'a>>>,
+//     stack: Vec<Thread<'a>>,
+//     shortest_paths: &'a ShortestPaths,
+//     total_runtime: u32,
 // }
 
 // impl<'a> AllExtensions<'a> {
-//     fn new(
-//         head: &'a Thread<'a>,
-//         shortest_paths: &'static ShortestPaths,
-//         total_runtime: u32,
-//     ) -> Self {
-//         let asdf = Box::new(head.extensions(shortest_paths, total_runtime));
+//     fn new(shortest_paths: &'a ShortestPaths, total_runtime: u32) -> Self {
+//         let stack = vec![Thread::Start];
+//         let layer =
+
+//         let last_thread = &stack[stack.len() - 1];
+//         let extensions = last_thread.extensions(shortest_paths, total_runtime);
+
 //         Self {
-//             head,
-//             head_extensions: asdf,
+//             stack,
+//             shortest_paths,
+//             total_runtime,
 //         }
 //     }
 // }
 
-// impl<'a> Iterator for AllExtensions<'a> {
+// impl<'a> Iterator for Thread<'a> {
 //     type Item = Thread<'a>;
 
 //     fn next(&mut self) -> Option<Self::Item> {
-//         todo!()
+//         if let Some(thread) = self.stack.pop() {
+//             for extended_thread in thread.extensions(self.shortest_paths, self.total_runtime) {
+//                 self.stack.push(extended_thread);
+//             }
+//             return Some(thread);
+//         }
+//         None
 //     }
 // }
 
@@ -104,10 +113,10 @@ impl<'a> Thread<'a> {
         total_runtime: u32,
         visit: &mut F,
     ) {
-        visit(self);
         for extension in self.extensions(shortest_paths, total_runtime) {
             extension.for_each_extension(shortest_paths, total_runtime, visit);
         }
+        visit(self);
     }
 
     fn extensions(&'a self, shortest_paths: &'a ShortestPaths, total_runtime: u32) -> Vec<Thread> {
