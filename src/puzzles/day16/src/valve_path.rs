@@ -88,9 +88,15 @@ impl ValvePath {
                     score,
                     done: extended_threads.iter().all(|thread| thread.done),
                     score_upper_bound: 0,
-                    open_valves: extended_threads.iter().fold(HashSet::new(), |acc, thread| {
-                        thread.opened_valves.union(&acc).cloned().collect()
-                    }),
+                    open_valves: extended_threads
+                        .iter()
+                        .flat_map(|thread| {
+                            thread.actions.iter().filter_map(|action| match action {
+                                ThreadAction::OpenValve(valve_name) => Some(*valve_name),
+                                _ => None,
+                            })
+                        })
+                        .collect(),
                     threads: extended_threads,
                 };
 

@@ -23,14 +23,12 @@ impl ThreadAction {
 pub struct ValveThread {
     pub actions: Vec<ThreadAction>,
     pub done: bool,
-    pub opened_valves: HashSet<&'static str>,
 }
 
 impl ValveThread {
     pub fn new(start_valve: &Valve) -> Self {
         Self {
             actions: vec![ThreadAction::Move(start_valve.name)],
-            opened_valves: HashSet::new(),
             done: false,
         }
     }
@@ -40,7 +38,6 @@ impl ValveThread {
         actions.push(ThreadAction::Move(valve));
         Self {
             actions,
-            opened_valves: self.opened_valves.clone(),
             done: false,
         }
     }
@@ -50,13 +47,10 @@ impl ValveThread {
     }
 
     pub fn open_valve(&self) -> Self {
-        let mut opened_valves = self.opened_valves.clone();
-        opened_valves.insert(self.current_valve_name());
         let mut actions = self.actions.clone();
         actions.push(ThreadAction::OpenValve(self.current_valve_name()));
         Self {
             actions,
-            opened_valves,
             done: false,
         }
     }
