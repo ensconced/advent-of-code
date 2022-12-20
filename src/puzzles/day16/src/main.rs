@@ -41,6 +41,18 @@ enum Thread<'a> {
     },
 }
 
+struct AllExtensions<'a> {
+    some_thread: Thread<'a>,
+}
+
+impl<'a> Iterator for AllExtensions<'a> {
+    type Item = Thread<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
+    }
+}
+
 impl<'a> Thread<'a> {
     fn minute_opened(&self) -> u32 {
         match self {
@@ -72,9 +84,12 @@ impl<'a> Thread<'a> {
         }
     }
 
-    fn visit_recursively<F: Fn(&Thread)>(&self, shortest_paths: &'a ShortestPaths, visit: &F) {
+    fn visit_recursively<F: FnMut(&Thread)>(
+        &self,
+        shortest_paths: &'a ShortestPaths,
+        visit: &mut F,
+    ) {
         visit(self);
-        // TODO - add bounds check here?
         for extension in self.extensions(shortest_paths) {
             extension.visit_recursively(shortest_paths, visit);
         }
@@ -108,7 +123,9 @@ fn main() {
         floyd_warshall_shortest_paths(&valve_lookup).filter_out_faulty_valves(&valve_lookup);
 
     let start = Thread::Start;
-    start.visit_recursively(&shortest_paths, &|asdf| {
-        println!("{}", asdf.score(&valve_lookup));
+    let mut part_1_answer = 0;
+    start.visit_recursively(&shortest_paths, &mut |thread| {
+        part_1_answer = u32::max(part_1_answer, thread.score(&valve_lookup));
     });
+    println!("part 1: {part_1_answer}")
 }
