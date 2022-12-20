@@ -1,6 +1,6 @@
 use crate::Valve;
 
-pub fn parse_valve(line: &str) -> (&str, Valve) {
+pub fn parse_valve(line: &'static str) -> (&str, Valve) {
     let parts: Vec<_> = line.split_ascii_whitespace().collect();
     let name = parts[1];
     let flow_rate = parts[4]

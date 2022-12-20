@@ -5,21 +5,26 @@ mod valve_thread;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use shortest_paths::ShortestPaths;
-use utils::read_input;
 
 use crate::{
     parser::parse_valve, shortest_paths::floyd_warshall_shortest_paths, valve_path::ValvePath,
 };
 
+pub type ValveLookup = HashMap<&'static str, Valve>;
+
 #[derive(Debug)]
-pub struct Valve<'a> {
-    name: &'a str,
+pub struct Valve {
+    name: &'static str,
     flow_rate: u32,
-    neighbours: HashSet<&'a str>,
+    neighbours: HashSet<&'static str>,
 }
 
-impl<'a> Valve<'a> {
-    fn new(name: &'a str, flow_rate: &str, neighbours: impl Iterator<Item = &'a str>) -> Self {
+impl Valve {
+    fn new(
+        name: &'static str,
+        flow_rate: &str,
+        neighbours: impl Iterator<Item = &'static str>,
+    ) -> Self {
         Self {
             name,
             flow_rate: flow_rate.parse().unwrap(),
@@ -28,15 +33,15 @@ impl<'a> Valve<'a> {
     }
 }
 
-struct PathCollection<'a> {
-    candidate_paths: BinaryHeap<ValvePath<'a>>,
+struct PathCollection {
+    candidate_paths: BinaryHeap<ValvePath>,
     best_score: u32,
 }
 
-impl<'a> PathCollection<'a> {
+impl PathCollection {
     fn new(
-        start_valve: &'a Valve,
-        valve_lookup: &'a HashMap<&'a str, Valve>,
+        start_valve: &Valve,
+        valve_lookup: &ValveLookup,
         shortest_paths: &ShortestPaths,
     ) -> Self {
         let path = ValvePath::new(start_valve, shortest_paths, valve_lookup, 1);
@@ -51,7 +56,7 @@ impl<'a> PathCollection<'a> {
     fn extend_candidate_paths(
         &mut self,
         shortest_paths: &ShortestPaths,
-        valve_lookup: &'a HashMap<&'a str, Valve>,
+        valve_lookup: &ValveLookup,
         minute: u32,
     ) {
         let mut prev_candidate_paths = std::mem::take(&mut self.candidate_paths);
@@ -87,7 +92,7 @@ impl<'a> PathCollection<'a> {
 
 pub const MINUTES: u32 = 30;
 
-fn part_one(valve_lookup: &HashMap<&str, Valve>, shortest_paths: &ShortestPaths) -> u32 {
+fn part_one(valve_lookup: &ValveLookup, shortest_paths: &ShortestPaths) -> u32 {
     let start_valve = valve_lookup.get("AA").unwrap();
 
     let mut paths = PathCollection::new(start_valve, valve_lookup, shortest_paths);
@@ -104,8 +109,8 @@ fn part_one(valve_lookup: &HashMap<&str, Valve>, shortest_paths: &ShortestPaths)
 }
 
 fn main() {
-    let input = read_input();
-    let valve_lookup: HashMap<_, _> = input.lines().map(parse_valve).collect();
+    let input = include_str!("../input.txt");
+    let valve_lookup: ValveLookup = input.lines().map(parse_valve).collect();
     let shortest_paths = floyd_warshall_shortest_paths(&valve_lookup);
 
     let part_1_answer = part_one(&valve_lookup, &shortest_paths);

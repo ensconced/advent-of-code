@@ -6,23 +6,23 @@ use std::{
 use crate::{
     shortest_paths::ShortestPaths,
     valve_thread::{ThreadAction, ThreadCombinationSet, ValveThread},
-    Valve, MINUTES,
+    Valve, ValveLookup, MINUTES,
 };
 
 #[derive(Clone, Debug)]
-pub struct ValvePath<'a> {
+pub struct ValvePath {
     pub done: bool,
     pub score_upper_bound: u32,
-    pub threads: Vec<ValveThread<'a>>,
+    pub threads: Vec<ValveThread>,
     pub score: u32,
-    open_valves: HashSet<&'a str>,
+    open_valves: HashSet<&'static str>,
 }
 
-impl<'a> ValvePath<'a> {
+impl ValvePath {
     pub fn new(
-        start_valve: &'a Valve,
+        start_valve: &Valve,
         shortest_paths: &ShortestPaths,
-        valve_lookup: &'a HashMap<&'a str, Valve>,
+        valve_lookup: &ValveLookup,
         thread_count: usize,
     ) -> Self {
         let minute = 0;
@@ -39,7 +39,7 @@ impl<'a> ValvePath<'a> {
         };
 
         result.score_upper_bound =
-            result.final_score_upper_bound(valve_lookup, shortest_paths, minute);
+            result.final_score_upper_bound(shortest_paths, minute, valve_lookup);
 
         result
     }
@@ -47,13 +47,13 @@ impl<'a> ValvePath<'a> {
     pub fn all_possible_extensions(
         self,
         minute: u32,
-        valve_lookup: &'a HashMap<&str, Valve>,
+        valve_lookup: &ValveLookup,
         shortest_paths: &ShortestPaths,
-    ) -> BinaryHeap<ValvePath<'a>> {
+    ) -> BinaryHeap<ValvePath> {
         let all_thread_combinations = self
             .threads
             .into_iter()
-            .map(|thread| thread.all_possible_extensions(valve_lookup, &self.open_valves))
+            .map(|thread| thread.all_possible_extensions(&self.open_valves, valve_lookup))
             .fold(
                 ThreadCombinationSet::new(),
                 |thread_combination_set, thread_extensions| {
@@ -95,7 +95,7 @@ impl<'a> ValvePath<'a> {
                 };
 
                 path.score_upper_bound =
-                    path.final_score_upper_bound(valve_lookup, shortest_paths, minute);
+                    path.final_score_upper_bound(shortest_paths, minute, valve_lookup);
                 path
             })
             .collect()
@@ -103,9 +103,9 @@ impl<'a> ValvePath<'a> {
 
     fn final_score_upper_bound(
         &self,
-        valve_lookup: &'a HashMap<&'a str, Valve>,
         shortest_paths: &ShortestPaths,
         minute: u32,
+        valve_lookup: &ValveLookup,
     ) -> u32 {
         let reachable_values = self.threads.iter().fold(HashMap::new(), |acc, thread| {
             thread
@@ -121,21 +121,21 @@ impl<'a> ValvePath<'a> {
     }
 }
 
-impl<'a> PartialEq for ValvePath<'a> {
+impl PartialEq for ValvePath {
     fn eq(&self, other: &Self) -> bool {
         self.score_upper_bound == other.score_upper_bound
     }
 }
 
-impl<'a> Eq for ValvePath<'a> {}
+impl Eq for ValvePath {}
 
-impl<'a> PartialOrd for ValvePath<'a> {
+impl PartialOrd for ValvePath {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.score_upper_bound.partial_cmp(&other.score_upper_bound)
     }
 }
 
-impl<'a> Ord for ValvePath<'a> {
+impl Ord for ValvePath {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.score_upper_bound.cmp(&other.score_upper_bound)
     }

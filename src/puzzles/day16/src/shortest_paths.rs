@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use crate::Valve;
+use crate::{Valve, ValveLookup};
 
 #[derive(Debug)]
-pub struct ShortestPaths<'a>(HashMap<&'a str, HashMap<&'a str, u32>>);
+pub struct ShortestPaths(HashMap<&'static str, HashMap<&'static str, u32>>);
 
-impl<'a> ShortestPaths<'a> {
-    pub fn all_shortest_paths_from(&'a self, source: &'a str) -> Option<&'a HashMap<&str, u32>> {
+impl ShortestPaths {
+    pub fn all_shortest_paths_from(&self, source: &'static str) -> Option<&HashMap<&str, u32>> {
         self.0.get(&source)
     }
 
@@ -17,7 +17,7 @@ impl<'a> ShortestPaths<'a> {
             .cloned()
     }
 
-    pub fn initialise(valve_lookup: &'a HashMap<&'a str, Valve>) -> Self {
+    pub fn initialise(valve_lookup: &HashMap<&str, Valve>) -> Self {
         Self(
             valve_lookup
                 .iter()
@@ -35,11 +35,7 @@ impl<'a> ShortestPaths<'a> {
         )
     }
 
-    fn include_valve(
-        &self,
-        valve: &'a Valve,
-        valve_lookup: &'a HashMap<&'a str, Valve>,
-    ) -> ShortestPaths<'a> {
+    fn include_valve(&self, valve: &Valve, valve_lookup: &HashMap<&str, Valve>) -> ShortestPaths {
         Self(
             valve_lookup
                 .keys()
@@ -72,9 +68,7 @@ impl<'a> ShortestPaths<'a> {
     }
 }
 
-pub fn floyd_warshall_shortest_paths<'a>(
-    valve_lookup: &'a HashMap<&'a str, Valve>,
-) -> ShortestPaths<'a> {
+pub fn floyd_warshall_shortest_paths<'a>(valve_lookup: &ValveLookup) -> ShortestPaths {
     valve_lookup
         .values()
         .fold(ShortestPaths::initialise(valve_lookup), |acc, valve| {
