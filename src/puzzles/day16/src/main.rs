@@ -72,7 +72,6 @@ impl PathCollection {
         &mut self,
         shortest_paths: &ShortestPaths,
         valve_lookup: &ValveLookup,
-        minute: u32,
         total_minutes: u32,
     ) {
         let mut prev_candidate_paths = std::mem::take(&mut self.candidate_paths);
@@ -82,7 +81,6 @@ impl PathCollection {
                     self.candidate_paths.push(old_candidate_path);
                 } else {
                     let mut extended_paths = old_candidate_path.all_possible_extensions(
-                        minute,
                         total_minutes,
                         valve_lookup,
                         shortest_paths,
@@ -113,33 +111,30 @@ fn part_one(valve_lookup: &ValveLookup, shortest_paths: &ShortestPaths) -> u32 {
     let runtime = 30;
     let mut paths = PathCollection::new(start_valve, valve_lookup, shortest_paths, runtime, 1);
 
-    for minute in 1..=runtime {
-        println!(
-            "minute: {minute}, path count: {}",
-            paths.candidate_paths.len()
-        );
-        paths.extend_candidate_paths(shortest_paths, valve_lookup, minute, runtime);
+    while paths.candidate_paths.iter().any(|path| !path.done) {
+        println!("extending...path count: {}", paths.candidate_paths.len());
+        paths.extend_candidate_paths(shortest_paths, valve_lookup, runtime);
     }
 
     paths.best_score()
 }
 
-fn part_two(valve_lookup: &ValveLookup, shortest_paths: &ShortestPaths) -> u32 {
-    let start_valve = valve_lookup.get("AA").unwrap();
+// fn part_two(valve_lookup: &ValveLookup, shortest_paths: &ShortestPaths) -> u32 {
+//     let start_valve = valve_lookup.get("AA").unwrap();
 
-    let runtime = 26;
-    let mut paths = PathCollection::new(start_valve, valve_lookup, shortest_paths, runtime, 2);
+//     let runtime = 26;
+//     let mut paths = PathCollection::new(start_valve, valve_lookup, shortest_paths, runtime, 2);
 
-    for minute in 1..=runtime {
-        println!(
-            "minute: {minute}, path count: {}",
-            paths.candidate_paths.len()
-        );
-        paths.extend_candidate_paths(shortest_paths, valve_lookup, minute, runtime);
-    }
+//     for minute in 1..=runtime {
+//         println!(
+//             "minute: {minute}, path count: {}",
+//             paths.candidate_paths.len()
+//         );
+//         paths.extend_candidate_paths(shortest_paths, valve_lookup, runtime);
+//     }
 
-    paths.best_score()
-}
+//     paths.best_score()
+// }
 
 fn main() {
     let input = include_str!("../input.txt");
@@ -149,6 +144,6 @@ fn main() {
     let part_1_answer = part_one(&valve_lookup, &shortest_paths);
     println!("part 1: {part_1_answer}");
 
-    let part_2_answer = part_two(&valve_lookup, &shortest_paths);
-    println!("part 2: {part_2_answer}");
+    // let part_2_answer = part_two(&valve_lookup, &shortest_paths);
+    // println!("part 2: {part_2_answer}");
 }

@@ -26,12 +26,11 @@ impl ValvePath {
         thread_count: usize,
         total_minutes: u32,
     ) -> Self {
-        let minute = 0;
         let open_valves = HashSet::new();
 
         let mut result = Self {
             score: 0,
-            threads: repeat_with(|| ValveThread::new(start_valve))
+            threads: repeat_with(|| ValveThread::new(start_valve, total_minutes))
                 .take(thread_count)
                 .collect(),
             open_valves,
@@ -39,15 +38,13 @@ impl ValvePath {
             score_upper_bound: 0,
         };
 
-        result.score_upper_bound =
-            result.final_score_upper_bound(shortest_paths, minute, total_minutes, valve_lookup);
+        result.score_upper_bound = result.final_score_upper_bound(shortest_paths, valve_lookup);
 
         result
     }
 
     pub fn all_possible_extensions(
         self,
-        minute: u32,
         total_minutes: u32,
         valve_lookup: &ValveLookup,
         shortest_paths: &ShortestPaths,
@@ -55,7 +52,14 @@ impl ValvePath {
         let all_thread_combinations = self
             .threads
             .into_iter()
-            .map(|thread| thread.all_possible_extensions(&self.open_valves, valve_lookup))
+            .map(|thread| {
+                thread.all_possible_extensions(
+                    &self.open_valves,
+                    valve_lookup,
+                    shortest_paths,
+                    total_minutes,
+                )
+            })
             .fold(
                 ThreadCombinationSet::new(),
                 |thread_combination_set, thread_extensions| {
@@ -67,27 +71,26 @@ impl ValvePath {
             .candidates
             .into_iter()
             .map(|threads| {
-                let mut opened_valve_counts = HashMap::new();
+                let mut valve_openings: HashMap<&str, Vec<(&str, u32)>> = HashMap::new();
                 for thread in threads.iter() {
                     if !thread.done {
-                        if let Some(ThreadAction::OpenValve(opened_valve)) = thread.actions.last() {
-                            opened_valve_counts
-                                .entry(*opened_valve)
-                                .and_modify(|x| *x += 1)
-                                .or_insert(1);
+                        if let Some(ThreadAction::OpenValve { valve_name, value }) =
+                            thread.actions.last()
+                        {
+                            valve_openings
+                                .entry(*valve_name)
+                                .or_default()
+                                .push((valve_name, *value));
                         }
                     }
                 }
-                (threads, opened_valve_counts)
+                (threads, valve_openings)
             })
-            .filter(|(_, opened_valve_counts)| !opened_valve_counts.iter().any(|(_, v)| *v > 1))
-            .map(|(extended_threads, opened_valve_counts)| {
-                let score = opened_valve_counts
-                    .keys()
-                    .fold(self.score, |acc, &valve_name| {
-                        acc + valve_lookup.get(valve_name).unwrap().flow_rate
-                            * (total_minutes - minute)
-                    });
+            .filter(|(_, valve_openings)| !valve_openings.iter().any(|(_, v)| v.len() > 1))
+            .map(|(extended_threads, valve_openings)| {
+                let score = valve_openings
+                    .into_iter()
+                    .fold(self.score, |acc, (_, actions)| acc + actions[0].1);
 
                 let mut path = ValvePath {
                     score,
@@ -97,7 +100,7 @@ impl ValvePath {
                         .iter()
                         .flat_map(|thread| {
                             thread.actions.iter().filter_map(|action| match action {
-                                ThreadAction::OpenValve(valve_name) => Some(*valve_name),
+                                ThreadAction::OpenValve { valve_name, .. } => Some(*valve_name),
                                 _ => None,
                             })
                         })
@@ -105,12 +108,7 @@ impl ValvePath {
                     threads: extended_threads,
                 };
 
-                path.score_upper_bound = path.final_score_upper_bound(
-                    shortest_paths,
-                    minute,
-                    total_minutes,
-                    valve_lookup,
-                );
+                path.score_upper_bound = path.final_score_upper_bound(shortest_paths, valve_lookup);
                 path
             })
             .collect()
@@ -119,23 +117,20 @@ impl ValvePath {
     fn final_score_upper_bound(
         &self,
         shortest_paths: &ShortestPaths,
-        minute: u32,
-        total_minutes: u32,
         valve_lookup: &ValveLookup,
     ) -> u32 {
         let reachable_values = self.threads.iter().fold(HashMap::new(), |acc, thread| {
             thread
-                .remaining_reachable_values(
-                    shortest_paths,
-                    &self.open_valves,
-                    minute,
-                    total_minutes,
-                    valve_lookup,
-                )
+                .remaining_reachable_values(shortest_paths, &self.open_valves, valve_lookup)
                 .into_iter()
-                .map(|(k, v)| {
-                    let max_val = acc.get(k).map(|acc_v| u32::max(*acc_v, v)).unwrap_or(v);
-                    (k, max_val)
+                .map(|(reachable_valve, valve_value)| {
+                    let max_val = acc
+                        .get(reachable_valve)
+                        .map(|max_value_obtainable_from_valve_acc| {
+                            u32::max(*max_value_obtainable_from_valve_acc, valve_value)
+                        })
+                        .unwrap_or(valve_value);
+                    (reachable_valve, max_val)
                 })
                 .collect()
         });

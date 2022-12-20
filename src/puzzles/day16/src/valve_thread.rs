@@ -10,14 +10,18 @@ pub enum ThreadAction {
         valve_name: &'static str,
         distance: u32,
     },
-    OpenValve(&'static str),
+    OpenValve {
+        valve_name: &'static str,
+        value: u32,
+    },
 }
 
 impl ThreadAction {
     fn valve(&self) -> &'static str {
         match self {
-            ThreadAction::Move { valve_name, .. } => valve_name,
-            ThreadAction::OpenValve(valve_name) => valve_name,
+            ThreadAction::Move { valve_name, .. } | ThreadAction::OpenValve { valve_name, .. } => {
+                valve_name
+            }
         }
     }
 }
@@ -30,19 +34,18 @@ pub struct ValveThread {
 }
 
 impl ValveThread {
-    pub fn new(start_valve: &Valve) -> Self {
+    pub fn new(start_valve: &Valve, total_minutes: u32) -> Self {
         Self {
             actions: vec![ThreadAction::Move {
                 valve_name: start_valve.name,
                 distance: 0,
             }],
             done: false,
-            minutes_remaining: 30,
+            minutes_remaining: total_minutes,
         }
     }
 
-    pub fn move_to_valve(&self, valve: &'static str) -> Self {
-        let distance = 1; // TODO - allow other values
+    pub fn move_to_valve(&self, valve: &'static str, distance: u32) -> Self {
         let mut actions = self.actions.clone();
         actions.push(ThreadAction::Move {
             valve_name: valve,
@@ -59,13 +62,21 @@ impl ValveThread {
         self.actions.last().unwrap().valve()
     }
 
-    pub fn open_valve(&self) -> Self {
+    pub fn open_valve(&self, valve_lookup: &ValveLookup) -> Self {
         let mut actions = self.actions.clone();
-        actions.push(ThreadAction::OpenValve(self.current_valve_name()));
+        let minutes_remaining = self.minutes_remaining - 1;
+        actions.push(ThreadAction::OpenValve {
+            valve_name: self.current_valve_name(),
+            value: minutes_remaining
+                * valve_lookup
+                    .get(self.current_valve_name())
+                    .unwrap()
+                    .flow_rate,
+        });
         Self {
             actions,
             done: false,
-            minutes_remaining: self.minutes_remaining - 1,
+            minutes_remaining,
         }
     }
 
@@ -74,25 +85,34 @@ impl ValveThread {
         self
     }
 
-    pub fn remaining_reachable_values(
+    fn reachable_open_valves(
         &self,
         shortest_paths: &ShortestPaths,
         open_valves: &HashSet<&'static str>,
-        minute: u32,
-        total_minutes: u32,
-        valve_lookup: &ValveLookup,
     ) -> HashMap<&'static str, u32> {
         shortest_paths
             .all_shortest_paths_from(self.current_valve_name())
             .unwrap()
             .iter()
             .filter(|(&valve_name, _)| !open_valves.contains(valve_name))
-            .map(|(&valve_name, path_length)| {
-                let min_minute_to_open_valve = minute + path_length + 1;
-                let value = if min_minute_to_open_valve >= total_minutes {
+            .map(|(&valve_name, &distance)| (valve_name, distance))
+            .collect()
+    }
+
+    pub fn remaining_reachable_values(
+        &self,
+        shortest_paths: &ShortestPaths,
+        open_valves: &HashSet<&'static str>,
+        valve_lookup: &ValveLookup,
+    ) -> HashMap<&'static str, u32> {
+        self.reachable_open_valves(shortest_paths, open_valves)
+            .into_iter()
+            .map(|(valve_name, path_length)| {
+                let time_to_open_valve = path_length + 1;
+                let value = if time_to_open_valve >= self.minutes_remaining {
                     0
                 } else {
-                    let max_minutes_of_flow = total_minutes - min_minute_to_open_valve;
+                    let max_minutes_of_flow = self.minutes_remaining - time_to_open_valve;
                     let flow_rate = valve_lookup.get(valve_name).unwrap().flow_rate;
                     flow_rate * max_minutes_of_flow
                 };
@@ -101,36 +121,29 @@ impl ValveThread {
             .collect()
     }
 
-    pub fn ends_with_pointless_cycle(&self) -> bool {
-        !self
-            .actions
-            .iter()
-            .rev()
-            .take_while(|action| matches!(action, ThreadAction::Move { .. }))
-            .all_unique()
-    }
-
     pub fn all_possible_extensions(
         self,
-        open_valves: &HashSet<&str>,
+        open_valves: &HashSet<&'static str>,
         valve_lookup: &ValveLookup,
+        shortest_paths: &ShortestPaths,
+        total_minutes: u32,
     ) -> Vec<ValveThread> {
         let mut result = Vec::new();
 
         let current_valve = valve_lookup.get(self.current_valve_name()).unwrap();
-        for path in current_valve
-            .neighbours
-            .iter()
-            .map(|neighbour| self.move_to_valve(neighbour))
-            .filter(|thread| !thread.ends_with_pointless_cycle())
+        for path in self
+            .reachable_open_valves(shortest_paths, open_valves)
+            .into_iter()
+            .filter(|(_, distance)| distance + 1 < self.minutes_remaining)
+            .map(|(neighbour, distance)| self.move_to_valve(neighbour, distance))
         {
             result.push(path);
         }
 
         if open_valves.contains(self.current_valve_name()) {
             result.push(self.do_nothing());
-        } else if current_valve.flow_rate > 0 {
-            result.push(self.open_valve());
+        } else if current_valve.flow_rate > 0 && self.minutes_remaining > 0 {
+            result.push(self.open_valve(valve_lookup));
         }
         result
     }
