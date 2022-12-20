@@ -1,7 +1,6 @@
 mod parser;
 mod shortest_paths;
 mod valve_path;
-mod valve_thread;
 use std::collections::{HashMap, HashSet};
 
 use shortest_paths::ShortestPaths;
@@ -39,18 +38,6 @@ enum Thread<'a> {
         minute_opened: u32,
         prev: &'a Thread<'a>,
     },
-}
-
-struct AllExtensions<'a> {
-    some_thread: Thread<'a>,
-}
-
-impl<'a> Iterator for AllExtensions<'a> {
-    type Item = Thread<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        todo!()
-    }
 }
 
 impl<'a> Thread<'a> {
