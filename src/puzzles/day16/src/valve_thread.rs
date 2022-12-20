@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 
-use crate::{shortest_paths::ShortestPaths, Valve, ValveLookup, MINUTES};
+use crate::{shortest_paths::ShortestPaths, Valve, ValveLookup};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ThreadAction {
@@ -65,6 +65,7 @@ impl ValveThread {
         shortest_paths: &ShortestPaths,
         open_valves: &HashSet<&'static str>,
         minute: u32,
+        total_minutes: u32,
         valve_lookup: &ValveLookup,
     ) -> HashMap<&'static str, u32> {
         shortest_paths
@@ -74,10 +75,10 @@ impl ValveThread {
             .filter(|(&valve_name, _)| !open_valves.contains(valve_name))
             .map(|(&valve_name, path_length)| {
                 let min_minute_to_open_valve = minute + path_length + 1;
-                let value = if min_minute_to_open_valve >= MINUTES {
+                let value = if min_minute_to_open_valve >= total_minutes {
                     0
                 } else {
-                    let max_minutes_of_flow = MINUTES - min_minute_to_open_valve;
+                    let max_minutes_of_flow = total_minutes - min_minute_to_open_valve;
                     let flow_rate = valve_lookup.get(valve_name).unwrap().flow_rate;
                     flow_rate * max_minutes_of_flow
                 };

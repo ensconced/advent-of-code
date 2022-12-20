@@ -43,8 +43,9 @@ impl PathCollection {
         start_valve: &Valve,
         valve_lookup: &ValveLookup,
         shortest_paths: &ShortestPaths,
+        total_minutes: u32,
     ) -> Self {
-        let path = ValvePath::new(start_valve, shortest_paths, valve_lookup, 1);
+        let path = ValvePath::new(start_valve, shortest_paths, valve_lookup, 1, total_minutes);
         let mut candidate_paths = BinaryHeap::new();
         candidate_paths.push(path);
         Self {
@@ -65,6 +66,7 @@ impl PathCollection {
         shortest_paths: &ShortestPaths,
         valve_lookup: &ValveLookup,
         minute: u32,
+        total_minutes: u32,
     ) {
         let mut prev_candidate_paths = std::mem::take(&mut self.candidate_paths);
         while let Some(old_candidate_path) = prev_candidate_paths.pop() {
@@ -74,6 +76,7 @@ impl PathCollection {
                 } else {
                     let mut extended_paths = old_candidate_path.all_possible_extensions(
                         minute,
+                        total_minutes,
                         valve_lookup,
                         shortest_paths,
                     );
@@ -97,19 +100,18 @@ impl PathCollection {
     }
 }
 
-pub const MINUTES: u32 = 30;
-
 fn part_one(valve_lookup: &ValveLookup, shortest_paths: &ShortestPaths) -> u32 {
     let start_valve = valve_lookup.get("AA").unwrap();
 
-    let mut paths = PathCollection::new(start_valve, valve_lookup, shortest_paths);
+    let runtime = 30;
+    let mut paths = PathCollection::new(start_valve, valve_lookup, shortest_paths, runtime);
 
-    for minute in 1..=MINUTES {
+    for minute in 1..=runtime {
         println!(
             "minute: {minute}, path count: {}",
             paths.candidate_paths.len()
         );
-        paths.extend_candidate_paths(shortest_paths, valve_lookup, minute);
+        paths.extend_candidate_paths(shortest_paths, valve_lookup, minute, runtime);
     }
 
     dbg!(&paths.best_path);

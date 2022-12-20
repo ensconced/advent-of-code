@@ -6,7 +6,7 @@ use std::{
 use crate::{
     shortest_paths::ShortestPaths,
     valve_thread::{ThreadAction, ThreadCombinationSet, ValveThread},
-    Valve, ValveLookup, MINUTES,
+    Valve, ValveLookup,
 };
 
 #[derive(Clone, Debug)]
@@ -24,6 +24,7 @@ impl ValvePath {
         shortest_paths: &ShortestPaths,
         valve_lookup: &ValveLookup,
         thread_count: usize,
+        total_minutes: u32,
     ) -> Self {
         let minute = 0;
         let open_valves = HashSet::new();
@@ -39,7 +40,7 @@ impl ValvePath {
         };
 
         result.score_upper_bound =
-            result.final_score_upper_bound(shortest_paths, minute, valve_lookup);
+            result.final_score_upper_bound(shortest_paths, minute, total_minutes, valve_lookup);
 
         result
     }
@@ -47,6 +48,7 @@ impl ValvePath {
     pub fn all_possible_extensions(
         self,
         minute: u32,
+        total_minutes: u32,
         valve_lookup: &ValveLookup,
         shortest_paths: &ShortestPaths,
     ) -> BinaryHeap<ValvePath> {
@@ -83,7 +85,8 @@ impl ValvePath {
                 let score = opened_valve_counts
                     .keys()
                     .fold(self.score, |acc, &valve_name| {
-                        acc + valve_lookup.get(valve_name).unwrap().flow_rate * (MINUTES - minute)
+                        acc + valve_lookup.get(valve_name).unwrap().flow_rate
+                            * (total_minutes - minute)
                     });
 
                 let mut path = ValvePath {
@@ -102,8 +105,12 @@ impl ValvePath {
                     threads: extended_threads,
                 };
 
-                path.score_upper_bound =
-                    path.final_score_upper_bound(shortest_paths, minute, valve_lookup);
+                path.score_upper_bound = path.final_score_upper_bound(
+                    shortest_paths,
+                    minute,
+                    total_minutes,
+                    valve_lookup,
+                );
                 path
             })
             .collect()
@@ -113,11 +120,18 @@ impl ValvePath {
         &self,
         shortest_paths: &ShortestPaths,
         minute: u32,
+        total_minutes: u32,
         valve_lookup: &ValveLookup,
     ) -> u32 {
         let reachable_values = self.threads.iter().fold(HashMap::new(), |acc, thread| {
             thread
-                .remaining_reachable_values(shortest_paths, &self.open_valves, minute, valve_lookup)
+                .remaining_reachable_values(
+                    shortest_paths,
+                    &self.open_valves,
+                    minute,
+                    total_minutes,
+                    valve_lookup,
+                )
                 .into_iter()
                 .map(|(k, v)| {
                     let max_val = acc.get(k).map(|acc_v| u32::max(*acc_v, v)).unwrap_or(v);
