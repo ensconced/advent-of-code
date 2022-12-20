@@ -61,28 +61,55 @@ impl ValvePath {
                 },
             );
 
-        all_thread_combinations
+        let result = all_thread_combinations
             .candidates
             .into_iter()
             .map(|threads| {
                 let mut opened_valve_counts = HashMap::new();
                 for thread in threads.iter() {
-                    if let Some(ThreadAction::OpenValve(opened_valve)) = thread.actions.last() {
-                        opened_valve_counts
-                            .entry(*opened_valve)
-                            .and_modify(|x| *x += 1)
-                            .or_insert(1);
+                    if !thread.done {
+                        if let Some(ThreadAction::OpenValve(opened_valve)) = thread.actions.last() {
+                            opened_valve_counts
+                                .entry(*opened_valve)
+                                .and_modify(|x| *x += 1)
+                                .or_insert(1);
+                        }
                     }
                 }
                 (threads, opened_valve_counts)
             })
             .filter(|(_, opened_valve_counts)| !opened_valve_counts.iter().any(|(_, v)| *v > 1))
             .map(|(extended_threads, opened_valve_counts)| {
+                let winning_thread_actions = vec![
+                    ThreadAction::Move("AA"),
+                    ThreadAction::Move("DD"),
+                    ThreadAction::OpenValve("DD"),
+                    ThreadAction::Move("AA"),
+                    ThreadAction::Move("BB"),
+                    ThreadAction::OpenValve("BB"),
+                    ThreadAction::Move("AA"),
+                    ThreadAction::Move("II"),
+                    ThreadAction::Move("JJ"),
+                    ThreadAction::OpenValve("JJ"),
+                ];
+
+                // let debug = extended_threads
+                //     .iter()
+                //     .any(|thread| thread.actions == winning_thread_actions);
+
                 let score = opened_valve_counts
                     .keys()
                     .fold(self.score, |acc, &valve_name| {
                         acc + valve_lookup.get(valve_name).unwrap().flow_rate * (MINUTES - minute)
                     });
+
+                if minute == 4 {
+                    dbg!(&opened_valve_counts);
+                    println!(
+                        "prev score: {}. new score: {}, minute: {}",
+                        self.score, score, minute
+                    );
+                }
 
                 let mut path = ValvePath {
                     score,
@@ -104,7 +131,12 @@ impl ValvePath {
                     path.final_score_upper_bound(shortest_paths, minute, valve_lookup);
                 path
             })
-            .collect()
+            .collect();
+        if minute == 4 {
+            dbg!(&result);
+        }
+
+        result
     }
 
     fn final_score_upper_bound(

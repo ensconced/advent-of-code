@@ -112,6 +112,7 @@ fn part_one(valve_lookup: &ValveLookup, shortest_paths: &ShortestPaths) -> u32 {
         paths.extend_candidate_paths(shortest_paths, valve_lookup, minute);
     }
 
+    dbg!(&paths.best_path);
     paths.best_score()
 }
 
