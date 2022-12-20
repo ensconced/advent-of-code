@@ -115,10 +115,11 @@ fn main() {
         floyd_warshall_shortest_paths(&valve_lookup).filter_out_faulty_valves(&valve_lookup);
 
     let start = Thread::Start;
+
     let mut part_1_answer = 0;
     let total_runtime = 30;
     start.for_each_extension(&shortest_paths, total_runtime, &mut |thread| {
         part_1_answer = u32::max(part_1_answer, thread.score(&valve_lookup, total_runtime));
     });
-    println!("part 1: {part_1_answer}")
+    println!("part 1: {part_1_answer}");
 }
