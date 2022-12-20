@@ -6,14 +6,17 @@ use crate::{shortest_paths::ShortestPaths, Valve, ValveLookup};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ThreadAction {
-    Move(&'static str),
+    Move {
+        valve_name: &'static str,
+        distance: u32,
+    },
     OpenValve(&'static str),
 }
 
 impl ThreadAction {
     fn valve(&self) -> &'static str {
         match self {
-            ThreadAction::Move(valve_name) => valve_name,
+            ThreadAction::Move { valve_name, .. } => valve_name,
             ThreadAction::OpenValve(valve_name) => valve_name,
         }
     }
@@ -28,14 +31,20 @@ pub struct ValveThread {
 impl ValveThread {
     pub fn new(start_valve: &Valve) -> Self {
         Self {
-            actions: vec![ThreadAction::Move(start_valve.name)],
+            actions: vec![ThreadAction::Move {
+                valve_name: start_valve.name,
+                distance: 0,
+            }],
             done: false,
         }
     }
 
     pub fn move_to_valve(&self, valve: &'static str) -> Self {
         let mut actions = self.actions.clone();
-        actions.push(ThreadAction::Move(valve));
+        actions.push(ThreadAction::Move {
+            valve_name: valve,
+            distance: 1,
+        });
         Self {
             actions,
             done: false,
@@ -92,7 +101,7 @@ impl ValveThread {
             .actions
             .iter()
             .rev()
-            .take_while(|action| matches!(action, ThreadAction::Move(_)))
+            .take_while(|action| matches!(action, ThreadAction::Move { .. }))
             .all_unique()
     }
 
