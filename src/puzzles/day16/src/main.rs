@@ -72,7 +72,6 @@ impl PathCollection {
         &mut self,
         shortest_paths: &ShortestPaths,
         valve_lookup: &ValveLookup,
-        total_minutes: u32,
     ) {
         let mut prev_candidate_paths = std::mem::take(&mut self.candidate_paths);
         while let Some(old_candidate_path) = prev_candidate_paths.pop() {
@@ -80,11 +79,8 @@ impl PathCollection {
                 if old_candidate_path.done {
                     self.candidate_paths.push(old_candidate_path);
                 } else {
-                    let mut extended_paths = old_candidate_path.all_possible_extensions(
-                        total_minutes,
-                        valve_lookup,
-                        shortest_paths,
-                    );
+                    let mut extended_paths =
+                        old_candidate_path.all_possible_extensions(valve_lookup, shortest_paths);
 
                     while let Some(extended_path) = extended_paths.pop() {
                         if extended_path.score_upper_bound > self.best_score() {
@@ -113,7 +109,7 @@ fn part_one(valve_lookup: &ValveLookup, shortest_paths: &ShortestPaths) -> u32 {
 
     while paths.candidate_paths.iter().any(|path| !path.done) {
         println!("extending...path count: {}", paths.candidate_paths.len());
-        paths.extend_candidate_paths(shortest_paths, valve_lookup, runtime);
+        paths.extend_candidate_paths(shortest_paths, valve_lookup);
     }
 
     paths.best_score()

@@ -45,26 +45,18 @@ impl ValveThread {
         }
     }
 
-    pub fn move_to_valve(&self, valve: &'static str, distance: u32) -> Self {
+    pub fn move_to_and_open_valve(
+        &self,
+        valve: &'static str,
+        distance: u32,
+        valve_lookup: &ValveLookup,
+    ) -> Self {
+        let minutes_remaining = self.minutes_remaining - distance - 1;
         let mut actions = self.actions.clone();
         actions.push(ThreadAction::Move {
             valve_name: valve,
             distance,
         });
-        Self {
-            actions,
-            done: false,
-            minutes_remaining: self.minutes_remaining - distance,
-        }
-    }
-
-    fn current_valve_name(&self) -> &'static str {
-        self.actions.last().unwrap().valve()
-    }
-
-    pub fn open_valve(&self, valve_lookup: &ValveLookup) -> Self {
-        let mut actions = self.actions.clone();
-        let minutes_remaining = self.minutes_remaining - 1;
         actions.push(ThreadAction::OpenValve {
             valve_name: self.current_valve_name(),
             value: minutes_remaining
@@ -73,11 +65,16 @@ impl ValveThread {
                     .unwrap()
                     .flow_rate,
         });
+
         Self {
             actions,
             done: false,
             minutes_remaining,
         }
+    }
+
+    fn current_valve_name(&self) -> &'static str {
+        self.actions.last().unwrap().valve()
     }
 
     fn do_nothing(mut self) -> Self {
@@ -126,24 +123,22 @@ impl ValveThread {
         open_valves: &HashSet<&'static str>,
         valve_lookup: &ValveLookup,
         shortest_paths: &ShortestPaths,
-        total_minutes: u32,
     ) -> Vec<ValveThread> {
         let mut result = Vec::new();
 
-        let current_valve = valve_lookup.get(self.current_valve_name()).unwrap();
         for path in self
             .reachable_open_valves(shortest_paths, open_valves)
             .into_iter()
             .filter(|(_, distance)| distance + 1 < self.minutes_remaining)
-            .map(|(neighbour, distance)| self.move_to_valve(neighbour, distance))
+            .map(|(neighbour, distance)| {
+                self.move_to_and_open_valve(neighbour, distance, valve_lookup)
+            })
         {
             result.push(path);
         }
 
         if open_valves.contains(self.current_valve_name()) {
             result.push(self.do_nothing());
-        } else if current_valve.flow_rate > 0 && self.minutes_remaining > 0 {
-            result.push(self.open_valve(valve_lookup));
         }
         result
     }

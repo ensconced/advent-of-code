@@ -45,7 +45,6 @@ impl ValvePath {
 
     pub fn all_possible_extensions(
         self,
-        total_minutes: u32,
         valve_lookup: &ValveLookup,
         shortest_paths: &ShortestPaths,
     ) -> BinaryHeap<ValvePath> {
@@ -53,12 +52,7 @@ impl ValvePath {
             .threads
             .into_iter()
             .map(|thread| {
-                thread.all_possible_extensions(
-                    &self.open_valves,
-                    valve_lookup,
-                    shortest_paths,
-                    total_minutes,
-                )
+                thread.all_possible_extensions(&self.open_valves, valve_lookup, shortest_paths)
             })
             .fold(
                 ThreadCombinationSet::new(),
