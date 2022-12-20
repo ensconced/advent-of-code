@@ -6,11 +6,14 @@ use crate::{Valve, ValveLookup};
 pub struct ShortestPaths(HashMap<&'static str, HashMap<&'static str, u32>>);
 
 impl ShortestPaths {
-    pub fn all_shortest_paths_from(&self, source: &str) -> Option<&HashMap<&'static str, u32>> {
+    pub fn all_shortest_paths_from(
+        &self,
+        source: &'static str,
+    ) -> Option<&HashMap<&'static str, u32>> {
         self.0.get(&source)
     }
 
-    pub fn shortest_path(&self, source: &str, target: &str) -> Option<u32> {
+    pub fn shortest_path(&self, source: &'static str, target: &'static str) -> Option<u32> {
         self.all_shortest_paths_from(source)
             .and_then(|inner_map| inner_map.get(&target))
             .cloned()
