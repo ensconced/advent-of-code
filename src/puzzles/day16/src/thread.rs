@@ -1,4 +1,6 @@
-use std::{borrow::Borrow, collections::HashMap, rc::Rc};
+use std::{collections::HashMap, rc::Rc};
+
+use itertools::Itertools;
 
 use crate::{shortest_paths::ShortestPaths, ValveLookup};
 
@@ -10,6 +12,75 @@ pub enum Thread {
         minute_opened: u32,
         prev: Rc<Thread>,
     },
+}
+
+pub fn pruning_search<'a, F: FnMut(&[Rc<Thread>], u32, &mut u32) -> bool>(
+    thread_set: &[Rc<Thread>],
+    shortest_paths: &'a ShortestPaths,
+    total_runtime: u32,
+    is_potential_solution: &mut F,
+    result: &mut u32,
+) {
+    if is_potential_solution(thread_set, total_runtime, result) {
+        for extended_thread_set in extensions(thread_set, shortest_paths, total_runtime) {
+            pruning_search(
+                &extended_thread_set,
+                shortest_paths,
+                total_runtime,
+                is_potential_solution,
+                result,
+            );
+        }
+    }
+}
+
+fn extensions(
+    thread_set: &[Rc<Thread>],
+    shortest_paths: &ShortestPaths,
+    total_runtime: u32,
+) -> Vec<Vec<Rc<Thread>>> {
+    thread_set
+        .iter()
+        .fold(vec![vec![]], |acc, thread| {
+            let reachable_valves = thread.reachable_closed_valves(shortest_paths, total_runtime);
+            let thread_extensions = reachable_valves.into_iter().map(|(target, minute_opened)| {
+                Rc::new(Thread::Extension {
+                    minute_opened,
+                    opened_valve: target,
+                    prev: thread.clone(),
+                })
+            });
+            thread_extensions
+                .cartesian_product(acc)
+                .map(|(extension, other_thread_extensions)| {
+                    let mut v = vec![extension];
+                    v.extend(other_thread_extensions.into_iter());
+                    v
+                })
+                .collect()
+        })
+        .into_iter()
+        .filter(|extensions| {
+            extensions
+                .iter()
+                .map(|thread| thread.current_valve())
+                .all_unique()
+        })
+        .collect()
+}
+
+pub fn max_remaining_value(
+    reachable_closed_valves: HashMap<&'static str, u32>,
+    total_runtime: u32,
+    valve_lookup: &ValveLookup,
+) -> u32 {
+    reachable_closed_valves
+        .into_iter()
+        .map(|(valve_name, minute_opened)| {
+            let valve = valve_lookup.get(valve_name).unwrap();
+            valve.flow_rate * (total_runtime - minute_opened)
+        })
+        .sum()
 }
 
 impl<'a> Thread {
@@ -44,47 +115,20 @@ impl<'a> Thread {
         }
     }
 
-    pub fn pruning_search<F: FnMut(&Rc<Thread>) -> bool>(
-        self: &Rc<Self>,
-        shortest_paths: &'a ShortestPaths,
-        total_runtime: u32,
-        is_potential_solution: &mut F,
-    ) {
-        if is_potential_solution(self) {
-            for extension in self.extensions(shortest_paths, total_runtime) {
-                extension.pruning_search(shortest_paths, total_runtime, is_potential_solution);
-            }
+    fn current_valve(&self) -> &'static str {
+        match self {
+            Thread::Start => "AA",
+            Thread::Extension { opened_valve, .. } => opened_valve,
         }
     }
 
-    pub fn score_upper_bound(
-        self: &Rc<Self>,
-        shortest_paths: &'a ShortestPaths,
-        total_runtime: u32,
-        valve_lookup: &ValveLookup,
-    ) -> u32 {
-        let remaining_value: u32 = self
-            .reachable_closed_valves(shortest_paths, total_runtime)
-            .into_iter()
-            .map(|(valve_name, minute_opened)| {
-                let valve = valve_lookup.get(valve_name).unwrap();
-                valve.flow_rate * (total_runtime - minute_opened)
-            })
-            .sum();
-        remaining_value + self.score(valve_lookup, total_runtime)
-    }
-
-    fn reachable_closed_valves(
+    pub fn reachable_closed_valves(
         self: &Rc<Self>,
         shortest_paths: &'a ShortestPaths,
         total_runtime: u32,
     ) -> HashMap<&'static str, u32> {
-        let current_valve = match self.borrow() {
-            Thread::Start => "AA",
-            Thread::Extension { opened_valve, .. } => opened_valve,
-        };
         shortest_paths
-            .all_shortest_paths_from(current_valve)
+            .all_shortest_paths_from(self.current_valve())
             .into_iter()
             .flatten()
             .filter_map(move |(target, path_length)| {
@@ -92,23 +136,6 @@ impl<'a> Thread {
                 let is_valid =
                     earliest_possible_minute_opened < total_runtime && !self.valve_is_open(target);
                 is_valid.then_some((*target, earliest_possible_minute_opened))
-            })
-            .collect()
-    }
-
-    fn extensions(
-        self: &Rc<Self>,
-        shortest_paths: &'a ShortestPaths,
-        total_runtime: u32,
-    ) -> Vec<Rc<Thread>> {
-        self.reachable_closed_valves(shortest_paths, total_runtime)
-            .into_iter()
-            .map(|(target, minute_opened)| {
-                Rc::new(Thread::Extension {
-                    minute_opened,
-                    opened_valve: target,
-                    prev: self.clone(),
-                })
             })
             .collect()
     }

@@ -6,7 +6,13 @@ use std::{
     rc::Rc,
 };
 
-use crate::{parser::parse_valve, shortest_paths::floyd_warshall_shortest_paths, thread::Thread};
+use itertools::Itertools;
+
+use crate::{
+    parser::parse_valve,
+    shortest_paths::floyd_warshall_shortest_paths,
+    thread::{max_remaining_value, pruning_search, Thread},
+};
 
 pub type ValveLookup = HashMap<&'static str, Valve>;
 
@@ -37,14 +43,70 @@ fn main() {
     let shortest_paths =
         floyd_warshall_shortest_paths(&valve_lookup).filter_out_faulty_valves(&valve_lookup);
 
-    let start = Rc::new(Thread::Start);
+    let mut pruner = |thread_set: &[Rc<Thread>], total_runtime: u32, result: &mut u32| {
+        let reachable_valves = thread_set
+            .iter()
+            .map(|thread| thread.reachable_closed_valves(&shortest_paths, total_runtime))
+            .reduce(|acc, thread_reachable_valves| {
+                acc.keys()
+                    .chain(thread_reachable_valves.keys())
+                    .unique()
+                    .map(|valve_name| {
+                        let earliest_valve_could_be_opened = acc
+                            .get(valve_name)
+                            .into_iter()
+                            .chain(thread_reachable_valves.get(valve_name))
+                            .min()
+                            .cloned()
+                            .unwrap();
+
+                        (*valve_name, earliest_valve_could_be_opened)
+                    })
+                    .collect()
+            });
+
+        let current_score = thread_set
+            .iter()
+            .map(|thread| thread.score(&valve_lookup, total_runtime))
+            .sum::<u32>();
+
+        let upper_bound = current_score
+            + max_remaining_value(reachable_valves.unwrap(), total_runtime, &valve_lookup);
+
+        if upper_bound <= *result {
+            false
+        } else {
+            *result = if current_score > *result {
+                dbg!(&thread_set);
+                current_score
+            } else {
+                *result
+            };
+
+            // *result = u32::max(current_score, *result);
+            true
+        }
+    };
 
     let mut part_1_answer = 0;
-    let total_runtime = 30;
-    start.pruning_search(&shortest_paths, total_runtime, &mut |thread| {
-        let score = thread.score(&valve_lookup, total_runtime);
-        part_1_answer = u32::max(part_1_answer, score);
-        thread.score_upper_bound(&shortest_paths, total_runtime, &valve_lookup) > part_1_answer
-    });
+    pruning_search(
+        &[Rc::new(Thread::Start)],
+        &shortest_paths,
+        30,
+        &mut pruner,
+        &mut part_1_answer,
+    );
+
     println!("part 1: {part_1_answer}");
+
+    let mut part_2_answer = 0;
+    pruning_search(
+        &[Rc::new(Thread::Start), Rc::new(Thread::Start)],
+        &shortest_paths,
+        26,
+        &mut pruner,
+        &mut part_2_answer,
+    );
+
+    println!("part 2: {part_2_answer}");
 }
