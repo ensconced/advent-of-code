@@ -75,7 +75,7 @@ impl<'a> Thread {
         }
     }
 
-    fn backtracking_search<F: FnMut(&Rc<Thread>) -> bool>(
+    fn pruning_search<F: FnMut(&Rc<Thread>) -> bool>(
         self: &Rc<Self>,
         shortest_paths: &'a ShortestPaths,
         total_runtime: u32,
@@ -83,7 +83,7 @@ impl<'a> Thread {
     ) {
         if is_potential_solution(self) {
             for extension in self.extensions(shortest_paths, total_runtime) {
-                extension.backtracking_search(shortest_paths, total_runtime, is_potential_solution);
+                extension.pruning_search(shortest_paths, total_runtime, is_potential_solution);
             }
         }
     }
@@ -155,7 +155,7 @@ fn main() {
 
     let mut part_1_answer = 0;
     let total_runtime = 30;
-    start.backtracking_search(&shortest_paths, total_runtime, &mut |thread| {
+    start.pruning_search(&shortest_paths, total_runtime, &mut |thread| {
         let score = thread.score(&valve_lookup, total_runtime);
         part_1_answer = u32::max(part_1_answer, score);
         thread.score_upper_bound(&shortest_paths, total_runtime, &valve_lookup) > score
