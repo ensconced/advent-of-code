@@ -43,42 +43,6 @@ enum Thread {
     },
 }
 
-// struct AllExtensions<'a> {
-//     stack: Vec<Thread<'a>>,
-//     shortest_paths: &'a ShortestPaths,
-//     total_runtime: u32,
-// }
-
-// impl<'a> AllExtensions<'a> {
-//     fn new(shortest_paths: &'a ShortestPaths, total_runtime: u32) -> Self {
-//         let stack = vec![Thread::Start];
-//         let layer =
-
-//         let last_thread = &stack[stack.len() - 1];
-//         let extensions = last_thread.extensions(shortest_paths, total_runtime);
-
-//         Self {
-//             stack,
-//             shortest_paths,
-//             total_runtime,
-//         }
-//     }
-// }
-
-// impl<'a> Iterator for Thread<'a> {
-//     type Item = Thread<'a>;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         if let Some(thread) = self.stack.pop() {
-//             for extended_thread in thread.extensions(self.shortest_paths, self.total_runtime) {
-//                 self.stack.push(extended_thread);
-//             }
-//             return Some(thread);
-//         }
-//         None
-//     }
-// }
-
 impl<'a> Thread {
     fn minute_opened(&self) -> u32 {
         match self {
