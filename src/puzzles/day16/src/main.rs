@@ -88,6 +88,23 @@ impl<'a> Thread {
         }
     }
 
+    fn score_upper_bound(
+        self: &Rc<Self>,
+        shortest_paths: &'a ShortestPaths,
+        total_runtime: u32,
+        valve_lookup: &ValveLookup,
+    ) -> u32 {
+        let remaining_value: u32 = self
+            .reachable_closed_valves(shortest_paths, total_runtime)
+            .into_iter()
+            .map(|(valve_name, minute_opened)| {
+                let valve = valve_lookup.get(valve_name).unwrap();
+                valve.flow_rate * (total_runtime - minute_opened)
+            })
+            .sum();
+        remaining_value + self.score(valve_lookup, total_runtime)
+    }
+
     fn reachable_closed_valves(
         self: &Rc<Self>,
         shortest_paths: &'a ShortestPaths,
@@ -102,9 +119,10 @@ impl<'a> Thread {
             .into_iter()
             .flatten()
             .filter_map(move |(target, path_length)| {
-                let minute_opened = self.minute_opened() + path_length + 1;
-                let is_valid = minute_opened < total_runtime && !self.valve_is_open(target);
-                is_valid.then_some((*target, minute_opened))
+                let earliest_possible_minute_opened = self.minute_opened() + path_length + 1;
+                let is_valid =
+                    earliest_possible_minute_opened < total_runtime && !self.valve_is_open(target);
+                is_valid.then_some((*target, earliest_possible_minute_opened))
             })
             .collect()
     }
