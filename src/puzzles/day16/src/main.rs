@@ -158,7 +158,7 @@ fn main() {
     start.backtracking_search(&shortest_paths, total_runtime, &mut |thread| {
         let score = thread.score(&valve_lookup, total_runtime);
         part_1_answer = u32::max(part_1_answer, score);
-        true
+        thread.score_upper_bound(&shortest_paths, total_runtime, &valve_lookup) > score
     });
     println!("part 1: {part_1_answer}");
 }
