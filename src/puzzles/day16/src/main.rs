@@ -75,16 +75,16 @@ impl<'a> Thread {
         }
     }
 
-    fn for_each_extension<F: FnMut(Rc<Thread>)>(
-        self: Rc<Self>,
+    fn for_each_extension<F: FnMut(&Rc<Thread>)>(
+        self: &Rc<Self>,
         shortest_paths: &'a ShortestPaths,
         total_runtime: u32,
         visit: &mut F,
     ) {
+        visit(self);
         for extension in self.extensions(shortest_paths, total_runtime) {
             extension.for_each_extension(shortest_paths, total_runtime, visit);
         }
-        visit(self);
     }
 
     fn extensions(
