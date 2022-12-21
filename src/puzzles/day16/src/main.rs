@@ -76,7 +76,12 @@ fn main() {
         if upper_bound <= *result {
             false
         } else {
-            *result = u32::max(current_score, *result);
+            *result = if current_score > *result {
+                dbg!(&thread_set);
+                current_score
+            } else {
+                *result
+            };
             true
         }
     };
