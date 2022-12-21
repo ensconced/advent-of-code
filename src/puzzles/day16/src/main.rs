@@ -75,16 +75,38 @@ impl<'a> Thread {
         }
     }
 
-    fn for_each_extension<F: FnMut(&Rc<Thread>)>(
+    fn backtracking_search<F: FnMut(&Rc<Thread>) -> bool>(
         self: &Rc<Self>,
         shortest_paths: &'a ShortestPaths,
         total_runtime: u32,
-        visit: &mut F,
+        is_potential_solution: &mut F,
     ) {
-        visit(self);
-        for extension in self.extensions(shortest_paths, total_runtime) {
-            extension.for_each_extension(shortest_paths, total_runtime, visit);
+        if is_potential_solution(self) {
+            for extension in self.extensions(shortest_paths, total_runtime) {
+                extension.backtracking_search(shortest_paths, total_runtime, is_potential_solution);
+            }
         }
+    }
+
+    fn reachable_closed_valves(
+        self: &Rc<Self>,
+        shortest_paths: &'a ShortestPaths,
+        total_runtime: u32,
+    ) -> HashMap<&'static str, u32> {
+        let current_valve = match self.borrow() {
+            Thread::Start => "AA",
+            Thread::Extension { opened_valve, .. } => opened_valve,
+        };
+        shortest_paths
+            .all_shortest_paths_from(current_valve)
+            .into_iter()
+            .flatten()
+            .filter_map(move |(target, path_length)| {
+                let minute_opened = self.minute_opened() + path_length + 1;
+                let is_valid = minute_opened < total_runtime && !self.valve_is_open(target);
+                is_valid.then_some((*target, minute_opened))
+            })
+            .collect()
     }
 
     fn extensions(
@@ -92,22 +114,14 @@ impl<'a> Thread {
         shortest_paths: &'a ShortestPaths,
         total_runtime: u32,
     ) -> Vec<Rc<Thread>> {
-        let current_valve = match self.borrow() {
-            Thread::Start => "AA",
-            Thread::Extension { opened_valve, .. } => opened_valve,
-        };
-        shortest_paths
-            .all_shortest_paths_from(current_valve)
-            .unwrap()
-            .iter()
-            .filter_map(move |(target, path_length)| {
-                let minute_opened = self.minute_opened() + path_length + 1;
-                let can_open_valve = minute_opened < total_runtime && !self.valve_is_open(target);
-                can_open_valve.then_some(Rc::new(Thread::Extension {
+        self.reachable_closed_valves(shortest_paths, total_runtime)
+            .into_iter()
+            .map(|(target, minute_opened)| {
+                Rc::new(Thread::Extension {
                     minute_opened,
                     opened_valve: target,
                     prev: self.clone(),
-                }))
+                })
             })
             .collect()
     }
@@ -123,8 +137,10 @@ fn main() {
 
     let mut part_1_answer = 0;
     let total_runtime = 30;
-    start.for_each_extension(&shortest_paths, total_runtime, &mut |thread| {
-        part_1_answer = u32::max(part_1_answer, thread.score(&valve_lookup, total_runtime));
+    start.backtracking_search(&shortest_paths, total_runtime, &mut |thread| {
+        let score = thread.score(&valve_lookup, total_runtime);
+        part_1_answer = u32::max(part_1_answer, score);
+        true
     });
     println!("part 1: {part_1_answer}");
 }
