@@ -77,7 +77,6 @@ fn main() {
             false
         } else {
             *result = if current_score > *result {
-                dbg!(&thread_set);
                 current_score
             } else {
                 *result

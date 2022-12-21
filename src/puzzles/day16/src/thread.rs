@@ -1,4 +1,7 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use itertools::Itertools;
 
@@ -39,13 +42,22 @@ fn extensions(
     shortest_paths: &ShortestPaths,
     total_runtime: u32,
 ) -> Vec<Vec<Rc<Thread>>> {
+    let opened_valves = thread_set
+        .iter()
+        .map(|thread| thread.all_opened_valves())
+        .reduce(|acc, x| acc.union(&x).cloned().collect())
+        .unwrap_or_default();
+
     thread_set
         .iter()
         .fold(
             vec![vec![]],
             |extended_thread_sets: Vec<Vec<Rc<Thread>>>, thread| {
-                let reachable_valves =
-                    thread.reachable_closed_valves(shortest_paths, total_runtime);
+                let reachable_valves: HashMap<&str, u32> = thread
+                    .reachable_closed_valves(shortest_paths, total_runtime)
+                    .into_iter()
+                    .filter(|(k, _)| !opened_valves.contains(k))
+                    .collect();
                 let thread_extensions =
                     reachable_valves.into_iter().map(|(target, minute_opened)| {
                         Rc::new(Thread::Extension {
@@ -56,15 +68,16 @@ fn extensions(
                     });
                 thread_extensions
                     .cartesian_product(extended_thread_sets)
-                    .filter(|(extension, partial_thread_set)| {
-                        !partial_thread_set
-                            .iter()
-                            .any(|thr| thr.valve_is_open(extension.current_valve()))
-                    })
                     .map(|(extension, other_thread_extensions)| {
                         let mut v = vec![extension];
                         v.extend(other_thread_extensions.into_iter());
                         v
+                    })
+                    .filter(|extension_combination| {
+                        extension_combination
+                            .iter()
+                            .map(|thr| thr.current_valve())
+                            .all_unique()
                     })
                     .collect()
             },
@@ -92,6 +105,18 @@ impl<'a> Thread {
         match self {
             Self::Start => 0,
             Self::Extension { minute_opened, .. } => *minute_opened,
+        }
+    }
+
+    fn all_opened_valves(&self) -> HashSet<&'static str> {
+        match self {
+            Self::Start => HashSet::new(),
+            Self::Extension {
+                opened_valve, prev, ..
+            } => HashSet::from([*opened_valve])
+                .union(&prev.all_opened_valves())
+                .cloned()
+                .collect(),
         }
     }
 
