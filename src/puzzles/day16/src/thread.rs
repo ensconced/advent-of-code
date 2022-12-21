@@ -41,31 +41,35 @@ fn extensions(
 ) -> Vec<Vec<Rc<Thread>>> {
     thread_set
         .iter()
-        .fold(vec![vec![]], |acc, thread| {
-            let reachable_valves = thread.reachable_closed_valves(shortest_paths, total_runtime);
-            let thread_extensions = reachable_valves.into_iter().map(|(target, minute_opened)| {
-                Rc::new(Thread::Extension {
-                    minute_opened,
-                    opened_valve: target,
-                    prev: thread.clone(),
-                })
-            });
-            thread_extensions
-                .cartesian_product(acc)
-                .map(|(extension, other_thread_extensions)| {
-                    let mut v = vec![extension];
-                    v.extend(other_thread_extensions.into_iter());
-                    v
-                })
-                .collect()
-        })
+        .fold(
+            vec![vec![]],
+            |extended_thread_sets: Vec<Vec<Rc<Thread>>>, thread| {
+                let reachable_valves =
+                    thread.reachable_closed_valves(shortest_paths, total_runtime);
+                let thread_extensions =
+                    reachable_valves.into_iter().map(|(target, minute_opened)| {
+                        Rc::new(Thread::Extension {
+                            minute_opened,
+                            opened_valve: target,
+                            prev: thread.clone(),
+                        })
+                    });
+                thread_extensions
+                    .cartesian_product(extended_thread_sets)
+                    .filter(|(extension, partial_thread_set)| {
+                        !partial_thread_set
+                            .iter()
+                            .any(|thr| thr.valve_is_open(extension.current_valve()))
+                    })
+                    .map(|(extension, other_thread_extensions)| {
+                        let mut v = vec![extension];
+                        v.extend(other_thread_extensions.into_iter());
+                        v
+                    })
+                    .collect()
+            },
+        )
         .into_iter()
-        .filter(|extensions| {
-            extensions
-                .iter()
-                .map(|thread| thread.current_valve())
-                .all_unique()
-        })
         .collect()
 }
 
