@@ -15,6 +15,9 @@ pub enum Thread {
         minute_opened: u32,
         prev: Rc<Thread>,
     },
+    Done {
+        prev: Rc<Thread>,
+    },
 }
 
 pub fn pruning_search<'a, F: FnMut(&[Rc<Thread>], u32, &mut u32) -> bool>(
@@ -65,7 +68,7 @@ fn extensions(
                 .filter(|(k, _)| !opened_valves.contains(k))
                 .collect();
 
-            reachable_valves
+            let mut result: Vec<_> = reachable_valves
                 .into_iter()
                 .map(|(target, minute_opened)| {
                     Rc::new(Thread::Extension {
@@ -74,7 +77,16 @@ fn extensions(
                         prev: thread.clone(),
                     })
                 })
-                .collect()
+                .collect();
+
+            // This is necessary to make it possible for some threads to continue even when others have no remaining possible extensions.
+            if result.is_empty() {
+                result.push(Rc::new(Thread::Done {
+                    prev: thread.clone(),
+                }))
+            }
+
+            result
         })
         .collect();
 
@@ -108,6 +120,7 @@ impl<'a> Thread {
         match self {
             Self::Start => 0,
             Self::Extension { minute_opened, .. } => *minute_opened,
+            Self::Done { prev } => prev.minute_opened(),
         }
     }
 
@@ -120,6 +133,7 @@ impl<'a> Thread {
                 .union(&prev.all_opened_valves())
                 .cloned()
                 .collect(),
+            Self::Done { prev } => prev.all_opened_valves(),
         }
     }
 
@@ -135,13 +149,15 @@ impl<'a> Thread {
                 valve.flow_rate * (total_runtime - minute_opened)
                     + prev.score(valve_lookup, total_runtime)
             }
+            Self::Done { prev } => prev.score(valve_lookup, total_runtime),
         }
     }
 
     fn current_valve(&self) -> &'static str {
         match self {
-            Thread::Start => "AA",
-            Thread::Extension { opened_valve, .. } => opened_valve,
+            Self::Start => "AA",
+            Self::Extension { opened_valve, .. } => opened_valve,
+            Self::Done { prev } => prev.current_valve(),
         }
     }
 
