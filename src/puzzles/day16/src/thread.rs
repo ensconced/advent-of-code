@@ -64,6 +64,7 @@ fn extensions(
                 .into_iter()
                 .filter(|(k, _)| !opened_valves.contains(k))
                 .collect();
+
             reachable_valves
                 .into_iter()
                 .map(|(target, minute_opened)| {
