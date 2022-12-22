@@ -56,7 +56,11 @@ fn extensions(
         .iter()
         .map(|thread| {
             let reachable_valves: HashMap<&str, u32> = thread
-                .reachable_closed_valves(shortest_paths, total_runtime, &opened_valves)
+                .earliest_times_to_open_reachable_closed_valves(
+                    shortest_paths,
+                    total_runtime,
+                    &opened_valves,
+                )
                 .into_iter()
                 .filter(|(k, _)| !opened_valves.contains(k))
                 .collect();
@@ -140,7 +144,7 @@ impl<'a> Thread {
         }
     }
 
-    pub fn reachable_closed_valves(
+    pub fn earliest_times_to_open_reachable_closed_valves(
         self: &Rc<Self>,
         shortest_paths: &'a ShortestPaths,
         total_runtime: u32,

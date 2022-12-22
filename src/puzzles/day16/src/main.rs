@@ -8,6 +8,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use shortest_paths::ShortestPaths;
 
 use crate::{
     parser::parse_valve,
@@ -38,6 +39,42 @@ impl Valve {
     }
 }
 
+fn earliest_times_to_open_reachable_valves(
+    thread_set: &[Rc<Thread>],
+    shortest_paths: &ShortestPaths,
+    total_runtime: u32,
+) -> HashMap<&'static str, u32> {
+    let already_opened_valves = all_opened_valves(thread_set);
+
+    thread_set
+        .iter()
+        .map(|thread| {
+            thread.earliest_times_to_open_reachable_closed_valves(
+                shortest_paths,
+                total_runtime,
+                &already_opened_valves,
+            )
+        })
+        .reduce(|acc, thread_reachable_closed_valves| {
+            acc.keys()
+                .chain(thread_reachable_closed_valves.keys())
+                .unique()
+                .map(|valve_name| {
+                    let earliest_valve_could_be_opened = acc
+                        .get(valve_name)
+                        .into_iter()
+                        .chain(thread_reachable_closed_valves.get(valve_name))
+                        .min()
+                        .cloned()
+                        .unwrap();
+
+                    (*valve_name, earliest_valve_could_be_opened)
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn main() {
     let input = include_str!("../input.txt");
     let valve_lookup: ValveLookup = input.lines().map(parse_valve).collect();
@@ -45,52 +82,22 @@ fn main() {
         floyd_warshall_shortest_paths(&valve_lookup).filter_out_faulty_valves(&valve_lookup);
 
     let mut pruner = |thread_set: &[Rc<Thread>], total_runtime: u32, result: &mut u32| {
-        let reachable_valves = thread_set
-            .iter()
-            .map(|thread| {
-                thread
-                    .reachable_closed_valves(
-                        &shortest_paths,
-                        total_runtime,
-                        &all_opened_valves(thread_set),
-                    )
-                    .into_iter()
-                    .collect::<HashMap<&'static str, u32>>()
-            })
-            .reduce(|acc, thread_reachable_valves| {
-                acc.keys()
-                    .chain(thread_reachable_valves.keys())
-                    .unique()
-                    .map(|valve_name| {
-                        let earliest_valve_could_be_opened = acc
-                            .get(valve_name)
-                            .into_iter()
-                            .chain(thread_reachable_valves.get(valve_name))
-                            .min()
-                            .cloned()
-                            .unwrap();
-
-                        (*valve_name, earliest_valve_could_be_opened)
-                    })
-                    .collect()
-            });
-
         let current_score = thread_set
             .iter()
             .map(|thread| thread.score(&valve_lookup, total_runtime))
             .sum::<u32>();
 
         let upper_bound = current_score
-            + max_remaining_value(reachable_valves.unwrap(), total_runtime, &valve_lookup);
+            + max_remaining_value(
+                earliest_times_to_open_reachable_valves(thread_set, &shortest_paths, total_runtime),
+                total_runtime,
+                &valve_lookup,
+            );
 
         if upper_bound <= *result {
             false
         } else {
-            *result = if current_score > *result {
-                current_score
-            } else {
-                *result
-            };
+            *result = u32::max(current_score, *result);
             true
         }
     };
