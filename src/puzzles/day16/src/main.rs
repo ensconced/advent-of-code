@@ -1,6 +1,7 @@
 mod parser;
 mod shortest_paths;
 mod thread;
+mod utils;
 use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
@@ -11,7 +12,7 @@ use itertools::Itertools;
 use crate::{
     parser::parse_valve,
     shortest_paths::floyd_warshall_shortest_paths,
-    thread::{max_remaining_value, pruning_search, Thread},
+    thread::{all_opened_valves, max_remaining_value, pruning_search, Thread},
 };
 
 pub type ValveLookup = HashMap<&'static str, Valve>;
@@ -46,7 +47,16 @@ fn main() {
     let mut pruner = |thread_set: &[Rc<Thread>], total_runtime: u32, result: &mut u32| {
         let reachable_valves = thread_set
             .iter()
-            .map(|thread| thread.reachable_closed_valves(&shortest_paths, total_runtime))
+            .map(|thread| {
+                thread
+                    .reachable_closed_valves(
+                        &shortest_paths,
+                        total_runtime,
+                        &all_opened_valves(thread_set),
+                    )
+                    .into_iter()
+                    .collect::<HashMap<&'static str, u32>>()
+            })
             .reduce(|acc, thread_reachable_valves| {
                 acc.keys()
                     .chain(thread_reachable_valves.keys())
